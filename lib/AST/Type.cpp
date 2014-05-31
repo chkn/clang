@@ -434,9 +434,9 @@ QualType Type::getPointeeType() const {
 
 const RecordType *Type::getAsRecordType() const {
   // If this is directly a record type, return it.
-  if (const RecordType *RT = dyn_cast<RecordType>(this)) {
+  if (const RecordType *RT = dyn_cast<RecordType>(CanonicalType)) {
     return RT;
-  } else if (const CLIArrayType *RT = dyn_cast<CLIArrayType>(this)) {
+  } else if (const CLIArrayType *RT = dyn_cast<CLIArrayType>(CanonicalType)) {
     return RT;
   }
   return 0;
