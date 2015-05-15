@@ -2503,8 +2503,9 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
     unsigned DiagID = 0;
 
     SourceLocation Loc = Tok.getLocation();
+    tok::TokenKind Kind = Tok.getKind();
 
-    switch (Tok.getKind()) {
+    switch (Kind) {
     default:
     DoneWithDeclSpec:
       if (!AttrsLastTime)
@@ -3147,6 +3148,7 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
       Token Aggregate;
       if (ParseAggregateClassKeywords(Key, GetLookAheadToken(2), Aggregate)) {
         Key = Aggregate;
+        Kind = tok::unknown;
         
         ConsumeToken();
         ConsumeToken();
@@ -3180,7 +3182,6 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
     case tok::kw_value_struct:
     case tok::kw_interface_class:
     case tok::kw_interface_struct: {
-      tok::TokenKind Kind = Tok.getKind();
       ConsumeToken();
 
 HandleClassSpecifier:
