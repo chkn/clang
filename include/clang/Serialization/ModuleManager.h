@@ -12,12 +12,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_SERIALIZATION_MODULE_MANAGER_H
-#define LLVM_CLANG_SERIALIZATION_MODULE_MANAGER_H
+#ifndef LLVM_CLANG_SERIALIZATION_MODULEMANAGER_H
+#define LLVM_CLANG_SERIALIZATION_MODULEMANAGER_H
 
 #include "clang/Basic/FileManager.h"
 #include "clang/Serialization/Module.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 namespace clang { 
 
@@ -34,13 +35,20 @@ class ModuleManager {
   
   /// \brief All loaded modules, indexed by name.
   llvm::DenseMap<const FileEntry *, ModuleFile *> Modules;
-  
+
+  typedef llvm::SetVector<const FileEntry *> AdditionalKnownModuleFileSet;
+
+  /// \brief Additional module files that are known but not loaded. Tracked
+  /// here so that we can re-export them if necessary.
+  AdditionalKnownModuleFileSet AdditionalKnownModuleFiles;
+
   /// \brief FileManager that handles translating between filenames and
   /// FileEntry *.
   FileManager &FileMgr;
   
   /// \brief A lookup of in-memory (virtual file) buffers
-  llvm::DenseMap<const FileEntry *, llvm::MemoryBuffer *> InMemoryBuffers;
+  llvm::DenseMap<const FileEntry *, std::unique_ptr<llvm::MemoryBuffer>>
+      InMemoryBuffers;
 
   /// \brief The visitation order.
   SmallVector<ModuleFile *, 4> VisitOrder;
@@ -65,7 +73,7 @@ class ModuleManager {
   /// calls to visit().
   struct VisitState {
     explicit VisitState(unsigned N)
-      : VisitNumber(N, 0), NextVisitNumber(1), NextState(0)
+      : VisitNumber(N, 0), NextVisitNumber(1), NextState(nullptr)
     {
       Stack.reserve(N);
     }
@@ -140,7 +148,7 @@ public:
   ModuleFile *lookup(const FileEntry *File);
 
   /// \brief Returns the in-memory (virtual file) buffer with the given name
-  llvm::MemoryBuffer *lookupBuffer(StringRef Name);
+  std::unique_ptr<llvm::MemoryBuffer> lookupBuffer(StringRef Name);
   
   /// \brief Number of modules loaded
   unsigned size() const { return Chain.size(); }
@@ -156,6 +164,8 @@ public:
     /// \brief The module file is out-of-date.
     OutOfDate
   };
+
+  typedef ASTFileSignature(*ASTFileSignatureReader)(llvm::BitstreamReader &);
 
   /// \brief Attempts to create a new module and add it to the list of known
   /// modules.
@@ -177,6 +187,12 @@ public:
   /// \param ExpectedModTime The expected modification time of the module
   /// file, used for validation. This will be zero if unknown.
   ///
+  /// \param ExpectedSignature The expected signature of the module file, used
+  /// for validation. This will be zero if unknown.
+  ///
+  /// \param ReadSignature Reads the signature from an AST file without actually
+  /// loading it.
+  ///
   /// \param Module A pointer to the module file if the module was successfully
   /// loaded.
   ///
@@ -189,15 +205,19 @@ public:
                             SourceLocation ImportLoc,
                             ModuleFile *ImportedBy, unsigned Generation,
                             off_t ExpectedSize, time_t ExpectedModTime,
+                            ASTFileSignature ExpectedSignature,
+                            ASTFileSignatureReader ReadSignature,
                             ModuleFile *&Module,
                             std::string &ErrorStr);
 
   /// \brief Remove the given set of modules.
   void removeModules(ModuleIterator first, ModuleIterator last,
+                     llvm::SmallPtrSetImpl<ModuleFile *> &LoadedSuccessfully,
                      ModuleMap *modMap);
 
   /// \brief Add an in-memory buffer the list of known buffers
-  void addInMemoryBuffer(StringRef FileName, llvm::MemoryBuffer *Buffer);
+  void addInMemoryBuffer(StringRef FileName,
+                         std::unique_ptr<llvm::MemoryBuffer> Buffer);
 
   /// \brief Set the global module index.
   void setGlobalIndex(GlobalModuleIndex *Index);
@@ -205,6 +225,19 @@ public:
   /// \brief Notification from the AST reader that the given module file
   /// has been "accepted", and will not (can not) be unloaded.
   void moduleFileAccepted(ModuleFile *MF);
+
+  /// \brief Notification from the frontend that the given module file is
+  /// part of this compilation (even if not imported) and, if this compilation
+  /// is exported, should be made available to importers of it.
+  bool addKnownModuleFile(StringRef FileName);
+
+  /// \brief Get a list of additional module files that are not currently
+  /// loaded but are considered to be part of the current compilation.
+  llvm::iterator_range<AdditionalKnownModuleFileSet::const_iterator>
+  getAdditionalKnownModuleFiles() {
+    return llvm::make_range(AdditionalKnownModuleFiles.begin(),
+                            AdditionalKnownModuleFiles.end());
+  }
 
   /// \brief Visit each of the modules.
   ///
@@ -230,7 +263,7 @@ public:
   /// Any module that is known to both the global module index and the module
   /// manager that is *not* in this set can be skipped.
   void visit(bool (*Visitor)(ModuleFile &M, void *UserData), void *UserData,
-             llvm::SmallPtrSet<ModuleFile *, 4> *ModuleFilesHit = 0);
+             llvm::SmallPtrSetImpl<ModuleFile *> *ModuleFilesHit = nullptr);
   
   /// \brief Visit each of the modules with a depth-first traversal.
   ///

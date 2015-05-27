@@ -13,14 +13,14 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "format-token-breaker"
-
 #include "BreakableToken.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Format/Format.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
+
+#define DEBUG_TYPE "format-token-breaker"
 
 namespace clang {
 namespace format {
@@ -82,11 +82,9 @@ static BreakableToken::Split getCommentSplit(StringRef Text,
   return BreakableToken::Split(StringRef::npos, 0);
 }
 
-static BreakableToken::Split getStringSplit(StringRef Text,
-                                            unsigned UsedColumns,
-                                            unsigned ColumnLimit,
-                                            unsigned TabWidth,
-                                            encoding::Encoding Encoding) {
+static BreakableToken::Split
+getStringSplit(StringRef Text, unsigned UsedColumns, unsigned ColumnLimit,
+               unsigned TabWidth, encoding::Encoding Encoding) {
   // FIXME: Reduce unit test case.
   if (Text.empty())
     return BreakableToken::Split(StringRef::npos, 0);
@@ -108,7 +106,7 @@ static BreakableToken::Split getStringSplit(StringRef Text,
           Text.substr(0, Advance), UsedColumns + Chars, TabWidth, Encoding);
     }
 
-    if (Chars > MaxSplit || Text.size() == Advance)
+    if (Chars > MaxSplit || Text.size() <= Advance)
       break;
 
     if (IsBlank(Text[0]))
@@ -184,19 +182,26 @@ void BreakableStringLiteral::insertBreak(unsigned LineIndex,
       Prefix, InPPDirective, 1, IndentLevel, LeadingSpaces);
 }
 
-static StringRef getLineCommentPrefix(StringRef Comment) {
-  static const char *const KnownPrefixes[] = { "/// ", "///", "// ", "//" };
-  for (size_t i = 0, e = llvm::array_lengthof(KnownPrefixes); i != e; ++i)
-    if (Comment.startswith(KnownPrefixes[i]))
-      return KnownPrefixes[i];
-  return "";
+static StringRef getLineCommentIndentPrefix(StringRef Comment) {
+  static const char *const KnownPrefixes[] = { "///", "//" };
+  StringRef LongestPrefix;
+  for (StringRef KnownPrefix : KnownPrefixes) {
+    if (Comment.startswith(KnownPrefix)) {
+      size_t PrefixLength = KnownPrefix.size();
+      while (PrefixLength < Comment.size() && Comment[PrefixLength] == ' ')
+        ++PrefixLength;
+      if (PrefixLength > LongestPrefix.size())
+        LongestPrefix = Comment.substr(0, PrefixLength);
+    }
+  }
+  return LongestPrefix;
 }
 
 BreakableLineComment::BreakableLineComment(
     const FormatToken &Token, unsigned IndentLevel, unsigned StartColumn,
     bool InPPDirective, encoding::Encoding Encoding, const FormatStyle &Style)
     : BreakableSingleLineToken(Token, IndentLevel, StartColumn,
-                               getLineCommentPrefix(Token.TokenText), "",
+                               getLineCommentIndentPrefix(Token.TokenText), "",
                                InPPDirective, Encoding, Style) {
   OriginalPrefix = Prefix;
   if (Token.TokenText.size() > Prefix.size() &&
@@ -272,6 +277,8 @@ BreakableBlockComment::BreakableBlockComment(
     // If the last line is empty, the closing "*/" will have a star.
     if (i + 1 == e && Lines[i].empty())
       break;
+    if (!Lines[i].empty() && i + 1 != e && Decoration.startswith(Lines[i]))
+      continue;
     while (!Lines[i].startswith(Decoration))
       Decoration = Decoration.substr(0, Decoration.size() - 1);
   }
@@ -292,13 +299,18 @@ BreakableBlockComment::BreakableBlockComment(
       }
       continue;
     }
+
     // The first line already excludes the star.
     // For all other lines, adjust the line to exclude the star and
     // (optionally) the first whitespace.
-    StartOfLineColumn[i] += Decoration.size();
-    Lines[i] = Lines[i].substr(Decoration.size());
-    LeadingWhitespace[i] += Decoration.size();
-    IndentAtLineBreak = std::min<int>(IndentAtLineBreak, StartOfLineColumn[i]);
+    unsigned DecorationSize =
+        Decoration.startswith(Lines[i]) ? Lines[i].size() : Decoration.size();
+    StartOfLineColumn[i] += DecorationSize;
+    Lines[i] = Lines[i].substr(DecorationSize);
+    LeadingWhitespace[i] += DecorationSize;
+    if (!Decoration.startswith(Lines[i]))
+      IndentAtLineBreak =
+          std::min<int>(IndentAtLineBreak, std::max(0, StartOfLineColumn[i]));
   }
   IndentAtLineBreak = std::max<unsigned>(IndentAtLineBreak, Decoration.size());
   DEBUG({
@@ -343,10 +355,9 @@ void BreakableBlockComment::adjustWhitespace(unsigned LineIndex,
       Lines[LineIndex].begin() - Lines[LineIndex - 1].end();
 
   // Adjust the start column uniformly across all lines.
-  StartOfLineColumn[LineIndex] = std::max<int>(
-      0,
+  StartOfLineColumn[LineIndex] =
       encoding::columnWidthWithTabs(Whitespace, 0, Style.TabWidth, Encoding) +
-          IndentDelta);
+      IndentDelta;
 }
 
 unsigned BreakableBlockComment::getLineCount() const { return Lines.size(); }
@@ -430,7 +441,6 @@ BreakableBlockComment::replaceWhitespaceBefore(unsigned LineIndex,
   unsigned WhitespaceOffsetInToken = Lines[LineIndex].data() -
                                      Tok.TokenText.data() -
                                      LeadingWhitespace[LineIndex];
-  assert(StartOfLineColumn[LineIndex] >= Prefix.size());
   Whitespaces.replaceWhitespaceInToken(
       Tok, WhitespaceOffsetInToken, LeadingWhitespace[LineIndex], "", Prefix,
       InPPDirective, 1, IndentLevel,
@@ -443,7 +453,7 @@ BreakableBlockComment::getContentStartColumn(unsigned LineIndex,
   // If we break, we always break at the predefined indent.
   if (TailOffset != 0)
     return IndentAtLineBreak;
-  return StartOfLineColumn[LineIndex];
+  return std::max(0, StartOfLineColumn[LineIndex]);
 }
 
 } // namespace format

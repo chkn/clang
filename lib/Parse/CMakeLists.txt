@@ -1,6 +1,6 @@
 set(LLVM_LINK_COMPONENTS
-  MCParser
   MC
+  MCParser
   Support
   )
 
@@ -17,13 +17,14 @@ add_clang_library(clangParse
   ParseOpenMP.cpp
   ParsePragma.cpp
   ParseStmt.cpp
+  ParseStmtAsm.cpp
   ParseTemplate.cpp
   ParseTentative.cpp
   Parser.cpp
 
   LINK_LIBS
-  clangBasic
   clangAST
+  clangBasic
   clangLex
   clangSema
   )

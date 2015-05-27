@@ -28,48 +28,99 @@ namespace {
 /// \brief Numbers things which need to correspond across multiple TUs.
 /// Typically these are things like static locals, lambdas, or blocks.
 class MicrosoftNumberingContext : public MangleNumberingContext {
-  unsigned NumStaticLocals;
+  llvm::DenseMap<const Type *, unsigned> ManglingNumbers;
+  unsigned LambdaManglingNumber;
+  unsigned StaticLocalNumber;
+  unsigned StaticThreadlocalNumber;
 
 public:
-  MicrosoftNumberingContext() : NumStaticLocals(0) { }
+  MicrosoftNumberingContext()
+      : MangleNumberingContext(), LambdaManglingNumber(0),
+        StaticLocalNumber(0), StaticThreadlocalNumber(0) {}
 
-  /// Static locals are numbered by source order.
-  virtual unsigned getManglingNumber(const VarDecl *VD) {
-    assert(VD->isStaticLocal());
-    return ++NumStaticLocals;
+  unsigned getManglingNumber(const CXXMethodDecl *CallOperator) override {
+    return ++LambdaManglingNumber;
+  }
+
+  unsigned getManglingNumber(const BlockDecl *BD) override {
+    const Type *Ty = nullptr;
+    return ++ManglingNumbers[Ty];
+  }
+
+  unsigned getStaticLocalNumber(const VarDecl *VD) override {
+    if (VD->getTLSKind())
+      return ++StaticThreadlocalNumber;
+    return ++StaticLocalNumber;
+  }
+
+  unsigned getManglingNumber(const VarDecl *VD,
+                             unsigned MSLocalManglingNumber) override {
+    return MSLocalManglingNumber;
+  }
+
+  unsigned getManglingNumber(const TagDecl *TD,
+                             unsigned MSLocalManglingNumber) override {
+    return MSLocalManglingNumber;
   }
 };
 
 class MicrosoftCXXABI : public CXXABI {
   ASTContext &Context;
+  llvm::SmallDenseMap<CXXRecordDecl *, CXXConstructorDecl *> RecordToCopyCtor;
+  llvm::SmallDenseMap<std::pair<const CXXConstructorDecl *, unsigned>, Expr *>
+      CtorToDefaultArgExpr;
+
 public:
   MicrosoftCXXABI(ASTContext &Ctx) : Context(Ctx) { }
 
   std::pair<uint64_t, unsigned>
-  getMemberPointerWidthAndAlign(const MemberPointerType *MPT) const;
+  getMemberPointerWidthAndAlign(const MemberPointerType *MPT) const override;
 
-  CallingConv getDefaultMethodCallConv(bool isVariadic) const {
+  CallingConv getDefaultMethodCallConv(bool isVariadic) const override {
     if (!isVariadic &&
         Context.getTargetInfo().getTriple().getArch() == llvm::Triple::x86)
       return CC_X86ThisCall;
     return CC_C;
   }
 
-  bool isNearlyEmpty(const CXXRecordDecl *RD) const {
+  bool isNearlyEmpty(const CXXRecordDecl *RD) const override {
     // FIXME: Audit the corners
     if (!RD->isDynamicClass())
       return false;
 
     const ASTRecordLayout &Layout = Context.getASTRecordLayout(RD);
-    
+
     // In the Microsoft ABI, classes can have one or two vtable pointers.
-    CharUnits PointerSize = 
-      Context.toCharUnitsFromBits(Context.getTargetInfo().getPointerWidth(0));
+    CharUnits PointerSize =
+        Context.toCharUnitsFromBits(Context.getTargetInfo().getPointerWidth(0));
     return Layout.getNonVirtualSize() == PointerSize ||
       Layout.getNonVirtualSize() == PointerSize * 2;
-  }    
+  }
 
-  MangleNumberingContext *createMangleNumberingContext() const {
+  void addDefaultArgExprForConstructor(const CXXConstructorDecl *CD,
+                                       unsigned ParmIdx, Expr *DAE) override {
+    CtorToDefaultArgExpr[std::make_pair(CD, ParmIdx)] = DAE;
+  }
+
+  Expr *getDefaultArgExprForConstructor(const CXXConstructorDecl *CD,
+                                        unsigned ParmIdx) override {
+    return CtorToDefaultArgExpr[std::make_pair(CD, ParmIdx)];
+  }
+
+  const CXXConstructorDecl *
+  getCopyConstructorForExceptionObject(CXXRecordDecl *RD) override {
+    return RecordToCopyCtor[RD];
+  }
+
+  void
+  addCopyConstructorForExceptionObject(CXXRecordDecl *RD,
+                                       CXXConstructorDecl *CD) override {
+    assert(CD != nullptr);
+    assert(RecordToCopyCtor[RD] == nullptr || RecordToCopyCtor[RD] == CD);
+    RecordToCopyCtor[RD] = CD;
+  }
+
+  MangleNumberingContext *createMangleNumberingContext() const override {
     return new MicrosoftNumberingContext();
   }
 };
@@ -93,7 +144,7 @@ static bool usesMultipleInheritanceModel(const CXXRecordDecl *RD) {
 }
 
 MSInheritanceAttr::Spelling CXXRecordDecl::calculateInheritanceModel() const {
-  if (!hasDefinition())
+  if (!hasDefinition() || isParsingBaseSpecifiers())
     return MSInheritanceAttr::Keyword_unspecified_inheritance;
   if (getNumVBases() > 0)
     return MSInheritanceAttr::Keyword_virtual_inheritance;
@@ -165,29 +216,28 @@ getMSMemberPointerSlots(const MemberPointerType *MPT) {
 
 std::pair<uint64_t, unsigned> MicrosoftCXXABI::getMemberPointerWidthAndAlign(
     const MemberPointerType *MPT) const {
-  const TargetInfo &Target = Context.getTargetInfo();
-  assert(Target.getTriple().getArch() == llvm::Triple::x86 ||
-         Target.getTriple().getArch() == llvm::Triple::x86_64);
-  unsigned Ptrs, Ints;
-  llvm::tie(Ptrs, Ints) = getMSMemberPointerSlots(MPT);
   // The nominal struct is laid out with pointers followed by ints and aligned
   // to a pointer width if any are present and an int width otherwise.
+  const TargetInfo &Target = Context.getTargetInfo();
   unsigned PtrSize = Target.getPointerWidth(0);
   unsigned IntSize = Target.getIntWidth();
+
+  unsigned Ptrs, Ints;
+  std::tie(Ptrs, Ints) = getMSMemberPointerSlots(MPT);
   uint64_t Width = Ptrs * PtrSize + Ints * IntSize;
   unsigned Align;
 
   // When MSVC does x86_32 record layout, it aligns aggregate member pointers to
   // 8 bytes.  However, __alignof usually returns 4 for data memptrs and 8 for
   // function memptrs.
-  if (Ptrs + Ints > 1 && Target.getTriple().getArch() == llvm::Triple::x86)
-    Align = 8 * 8;
+  if (Ptrs + Ints > 1 && Target.getTriple().isArch32Bit())
+    Align = 64;
   else if (Ptrs)
     Align = Target.getPointerAlign(0);
   else
     Align = Target.getIntAlign();
 
-  if (Target.getTriple().getArch() == llvm::Triple::x86_64)
+  if (Target.getTriple().isArch64Bit())
     Width = llvm::RoundUpToAlignment(Width, Align);
   return std::make_pair(Width, Align);
 }

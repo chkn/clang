@@ -46,7 +46,12 @@ Decl *MultiplexExternalSemaSource::GetExternalDecl(uint32_t ID) {
   for(size_t i = 0; i < Sources.size(); ++i)
     if (Decl *Result = Sources[i]->GetExternalDecl(ID))
       return Result;
-  return 0;
+  return nullptr;
+}
+
+void MultiplexExternalSemaSource::CompleteRedeclChain(const Decl *D) {
+  for (size_t i = 0; i < Sources.size(); ++i)
+    Sources[i]->CompleteRedeclChain(D);
 }
 
 Selector MultiplexExternalSemaSource::GetExternalSelector(uint32_t ID) {
@@ -70,7 +75,7 @@ Stmt *MultiplexExternalSemaSource::GetExternalDeclStmt(uint64_t Offset) {
   for(size_t i = 0; i < Sources.size(); ++i)
     if (Stmt *Result = Sources[i]->GetExternalDeclStmt(Offset))
       return Result;
-  return 0;
+  return nullptr;
 }
 
 CXXBaseSpecifier *MultiplexExternalSemaSource::GetExternalCXXBaseSpecifiers(
@@ -78,7 +83,15 @@ CXXBaseSpecifier *MultiplexExternalSemaSource::GetExternalCXXBaseSpecifiers(
   for(size_t i = 0; i < Sources.size(); ++i)
     if (CXXBaseSpecifier *R = Sources[i]->GetExternalCXXBaseSpecifiers(Offset))
       return R;
-  return 0; 
+  return nullptr;
+}
+
+CXXCtorInitializer **
+MultiplexExternalSemaSource::GetExternalCXXCtorInitializers(uint64_t Offset) {
+  for (auto *S : Sources)
+    if (auto *R = S->GetExternalCXXCtorInitializers(Offset))
+      return R;
+  return nullptr;
 }
 
 bool MultiplexExternalSemaSource::
@@ -231,16 +244,10 @@ void MultiplexExternalSemaSource::ReadExtVectorDecls(
     Sources[i]->ReadExtVectorDecls(Decls);
 }
 
-void MultiplexExternalSemaSource::ReadDynamicClasses(
-                                       SmallVectorImpl<CXXRecordDecl*> &Decls) {
+void MultiplexExternalSemaSource::ReadUnusedLocalTypedefNameCandidates(
+    llvm::SmallSetVector<const TypedefNameDecl *, 4> &Decls) {
   for(size_t i = 0; i < Sources.size(); ++i)
-    Sources[i]->ReadDynamicClasses(Decls);
-}
-
-void MultiplexExternalSemaSource::ReadLocallyScopedExternCDecls(
-                                           SmallVectorImpl<NamedDecl*> &Decls) {
-  for(size_t i = 0; i < Sources.size(); ++i)
-    Sources[i]->ReadLocallyScopedExternCDecls(Decls);
+    Sources[i]->ReadUnusedLocalTypedefNameCandidates(Decls);
 }
 
 void MultiplexExternalSemaSource::ReadReferencedSelectors(
@@ -269,7 +276,7 @@ void MultiplexExternalSemaSource::ReadPendingInstantiations(
 }
 
 void MultiplexExternalSemaSource::ReadLateParsedTemplates(
-    llvm::DenseMap<const FunctionDecl *, LateParsedTemplate *> &LPTMap) {
+    llvm::MapVector<const FunctionDecl *, LateParsedTemplate *> &LPTMap) {
   for (size_t i = 0; i < Sources.size(); ++i)
     Sources[i]->ReadLateParsedTemplates(LPTMap);
 }

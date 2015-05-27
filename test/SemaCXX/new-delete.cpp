@@ -521,3 +521,14 @@ class DeletingPlaceholder {
 namespace PR18544 {
   inline void *operator new(size_t); // expected-error {{'operator new' cannot be declared inside a namespace}}
 }
+
+// PR19968
+inline void* operator new(); // expected-error {{'operator new' must have at least one parameter}}
+
+namespace {
+template <class C>
+struct A {
+  void f() { this->::new; } // expected-error {{expected unqualified-id}}
+  void g() { this->::delete; } // expected-error {{expected unqualified-id}}
+};
+}

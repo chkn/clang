@@ -37,18 +37,20 @@ namespace {
                      const LangOptions &LangOpts,
                      bool supportsMultipleFiles);
 
-    virtual ~PlistDiagnostics() {}
+    ~PlistDiagnostics() override {}
 
     void FlushDiagnosticsImpl(std::vector<const PathDiagnostic *> &Diags,
-                              FilesMade *filesMade);
-    
-    virtual StringRef getName() const {
+                              FilesMade *filesMade) override;
+
+    StringRef getName() const override {
       return "PlistDiagnostics";
     }
 
-    PathGenerationScheme getGenerationScheme() const { return Extensive; }
-    bool supportsLogicalOpControlFlow() const { return true; }
-    virtual bool supportsCrossFileDiagnostics() const {
+    PathGenerationScheme getGenerationScheme() const override {
+      return Extensive;
+    }
+    bool supportsLogicalOpControlFlow() const override { return true; }
+    bool supportsCrossFileDiagnostics() const override {
       return SupportsCrossFileDiagnostics;
     }
   };
@@ -104,13 +106,14 @@ static void ReportControlFlow(raw_ostream &o,
     // by forcing to use only the beginning of the range.  This simplifies the layout
     // logic for clients.
     Indent(o, indent) << "<key>start</key>\n";
-    SourceLocation StartEdge = I->getStart().asRange().getBegin();
-    EmitRange(o, SM, LangOpts, CharSourceRange::getTokenRange(StartEdge), FM,
+    SourceRange StartEdge(
+        SM.getExpansionLoc(I->getStart().asRange().getBegin()));
+    EmitRange(o, SM, Lexer::getAsCharRange(StartEdge, SM, LangOpts), FM,
               indent + 1);
 
     Indent(o, indent) << "<key>end</key>\n";
-    SourceLocation EndEdge = I->getEnd().asRange().getBegin();
-    EmitRange(o, SM, LangOpts, CharSourceRange::getTokenRange(EndEdge), FM,
+    SourceRange EndEdge(SM.getExpansionLoc(I->getEnd().asRange().getBegin()));
+    EmitRange(o, SM, Lexer::getAsCharRange(EndEdge, SM, LangOpts), FM,
               indent + 1);
 
     --indent;
@@ -152,7 +155,7 @@ static void ReportEvent(raw_ostream &o, const PathDiagnosticPiece& P,
   FullSourceLoc L = P.getLocation().asLocation();
 
   Indent(o, indent) << "<key>location</key>\n";
-  EmitLocation(o, SM, LangOpts, L, FM, indent);
+  EmitLocation(o, SM, L, FM, indent);
 
   // Output the ranges (if any).
   ArrayRef<SourceRange> Ranges = P.getRanges();
@@ -161,18 +164,17 @@ static void ReportEvent(raw_ostream &o, const PathDiagnosticPiece& P,
     Indent(o, indent) << "<key>ranges</key>\n";
     Indent(o, indent) << "<array>\n";
     ++indent;
-    for (ArrayRef<SourceRange>::iterator I = Ranges.begin(), E = Ranges.end();
-         I != E; ++I) {
-      EmitRange(o, SM, LangOpts, CharSourceRange::getTokenRange(*I), FM,
-                indent + 1);
-    }
+    for (auto &R : Ranges)
+      EmitRange(o, SM,
+                Lexer::getAsCharRange(SM.getExpansionRange(R), SM, LangOpts),
+                FM, indent + 1);
     --indent;
     Indent(o, indent) << "</array>\n";
   }
   
   // Output the call depth.
-  Indent(o, indent) << "<key>depth</key>"
-                    << "<integer>" << depth << "</integer>\n";
+  Indent(o, indent) << "<key>depth</key>";
+  EmitInteger(o, depth) << '\n';
 
   // Output the text.
   assert(!P.getString().empty());
@@ -290,7 +292,7 @@ void PlistDiagnostics::FlushDiagnosticsImpl(
   // ranges of the diagnostics.
   FIDMap FM;
   SmallVector<FileID, 10> Fids;
-  const SourceManager* SM = 0;
+  const SourceManager* SM = nullptr;
 
   if (!Diags.empty())
     SM = &(*(*Diags.begin())->path.begin())->getLocation().getManager();
@@ -309,7 +311,7 @@ void PlistDiagnostics::FlushDiagnosticsImpl(
 
       for (PathPieces::const_iterator I = path.begin(), E = path.end(); I != E;
            ++I) {
-        const PathDiagnosticPiece *piece = I->getPtr();
+        const PathDiagnosticPiece *piece = I->get();
         AddFID(FM, Fids, *SM, piece->getLocation().asLocation());
         ArrayRef<SourceRange> Ranges = piece->getRanges();
         for (ArrayRef<SourceRange>::iterator I = Ranges.begin(),
@@ -336,15 +338,14 @@ void PlistDiagnostics::FlushDiagnosticsImpl(
   }
 
   // Open the file.
-  std::string ErrMsg;
-  llvm::raw_fd_ostream o(OutputFile.c_str(), ErrMsg, llvm::sys::fs::F_Text);
-  if (!ErrMsg.empty()) {
-    llvm::errs() << "warning: could not create file: " << OutputFile << '\n';
+  std::error_code EC;
+  llvm::raw_fd_ostream o(OutputFile, EC, llvm::sys::fs::F_Text);
+  if (EC) {
+    llvm::errs() << "warning: could not create file: " << EC.message() << '\n';
     return;
   }
 
-  // Write the plist header.
-  o << PlistHeader;
+  EmitPlistHeader(o);
 
   // Write the root object: a <dict> containing...
   //  - "clang_version", the string representation of clang version
@@ -356,11 +357,8 @@ void PlistDiagnostics::FlushDiagnosticsImpl(
   o << " <key>files</key>\n"
        " <array>\n";
 
-  for (SmallVectorImpl<FileID>::iterator I=Fids.begin(), E=Fids.end();
-       I!=E; ++I) {
-    o << "  ";
-    EmitString(o, SM->getFileEntryForID(*I)->getName()) << '\n';
-  }
+  for (FileID FID : Fids)
+    EmitString(o << "  ", SM->getFileEntryForID(FID)->getName()) << '\n';
 
   o << " </array>\n"
        " <key>diagnostics</key>\n"
@@ -389,7 +387,9 @@ void PlistDiagnostics::FlushDiagnosticsImpl(
     EmitString(o, D->getCategory()) << '\n';
     o << "   <key>type</key>";
     EmitString(o, D->getBugType()) << '\n';
-    
+    o << "   <key>check_name</key>";
+    EmitString(o, D->getCheckName()) << '\n';
+ 
     // Output information about the semantic context where
     // the issue occurred.
     if (const Decl *DeclWithIssue = D->getDeclWithIssue()) {
@@ -455,7 +455,7 @@ void PlistDiagnostics::FlushDiagnosticsImpl(
 
     // Output the location of the bug.
     o << "  <key>location</key>\n";
-    EmitLocation(o, *SM, LangOpts, D->getLocation().asLocation(), FM, 2);
+    EmitLocation(o, *SM, D->getLocation().asLocation(), FM, 2);
 
     // Output the diagnostic to the sub-diagnostic client, if any.
     if (!filesMade->empty()) {

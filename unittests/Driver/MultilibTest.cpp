@@ -13,9 +13,9 @@
 
 #include "clang/Driver/Multilib.h"
 #include "clang/Basic/LLVM.h"
-#include "gtest/gtest.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
+#include "gtest/gtest.h"
 
 using namespace clang::driver;
 using namespace clang;
@@ -254,12 +254,6 @@ TEST(MultilibTest, SetRegexFilter) {
 }
 
 TEST(MultilibTest, SetFilterObject) {
-  // Filter object
-  struct StartsWithP : public MultilibSet::FilterCallback {
-    bool operator()(const Multilib &M) const LLVM_OVERRIDE {
-      return StringRef(M.gccSuffix()).startswith("/p");
-    }
-  };
   MultilibSet MS;
   MS.Maybe(Multilib("orange"));
   MS.Maybe(Multilib("pear"));
@@ -273,7 +267,9 @@ TEST(MultilibTest, SetFilterObject) {
                             1 /* orange/plum */ +
                             1 /* orange/pear/plum */ )
       << "Size before filter was incorrect. Contents:\n" << MS;
-  MS.FilterOut(StartsWithP());
+  MS.FilterOut([](const Multilib &M) {
+    return StringRef(M.gccSuffix()).startswith("/p");
+  });
   ASSERT_EQ((int)MS.size(), 1 /* Default */ +
                             1 /* orange */ +
                             1 /* orange/pear */ +

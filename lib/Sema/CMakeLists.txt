@@ -22,6 +22,7 @@ set(SOURCES
   SemaChecking.cpp
   SemaCodeComplete.cpp
   SemaConsumer.cpp
+  SemaCUDA.cpp
   SemaDecl.cpp
   SemaDeclAttr.cpp
   SemaDeclCXX.cpp

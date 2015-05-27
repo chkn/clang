@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_TOKENLEXER_H
-#define LLVM_CLANG_TOKENLEXER_H
+#ifndef LLVM_CLANG_LEX_TOKENLEXER_H
+#define LLVM_CLANG_LEX_TOKENLEXER_H
 
 #include "clang/Basic/SourceLocation.h"
 
@@ -99,8 +99,8 @@ class TokenLexer {
   /// should not be subject to further macro expansion.
   bool DisableMacroExpansion : 1;
 
-  TokenLexer(const TokenLexer &) LLVM_DELETED_FUNCTION;
-  void operator=(const TokenLexer &) LLVM_DELETED_FUNCTION;
+  TokenLexer(const TokenLexer &) = delete;
+  void operator=(const TokenLexer &) = delete;
 public:
   /// Create a TokenLexer for the specified macro with the specified actual
   /// arguments.  Note that this ctor takes ownership of the ActualArgs pointer.
@@ -108,7 +108,7 @@ public:
   /// identifier for an object-like macro.
   TokenLexer(Token &Tok, SourceLocation ILEnd, MacroInfo *MI,
              MacroArgs *ActualArgs, Preprocessor &pp)
-    : Macro(0), ActualArgs(0), PP(pp), OwnsTokens(false) {
+    : Macro(nullptr), ActualArgs(nullptr), PP(pp), OwnsTokens(false) {
     Init(Tok, ILEnd, MI, ActualArgs);
   }
 
@@ -124,7 +124,7 @@ public:
   /// the token lexer is empty.
   TokenLexer(const Token *TokArray, unsigned NumToks, bool DisableExpansion,
              bool ownsTokens, Preprocessor &pp)
-    : Macro(0), ActualArgs(0), PP(pp), OwnsTokens(false) {
+    : Macro(nullptr), ActualArgs(nullptr), PP(pp), OwnsTokens(false) {
     Init(TokArray, NumToks, DisableExpansion, ownsTokens);
   }
 

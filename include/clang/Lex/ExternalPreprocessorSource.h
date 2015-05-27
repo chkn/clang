@@ -11,12 +11,13 @@
 //  construction of macro definitions from some external source.
 //
 //===----------------------------------------------------------------------===//
-#ifndef LLVM_CLANG_LEX_EXTERNAL_PREPROCESSOR_SOURCE_H
-#define LLVM_CLANG_LEX_EXTERNAL_PREPROCESSOR_SOURCE_H
+#ifndef LLVM_CLANG_LEX_EXTERNALPREPROCESSORSOURCE_H
+#define LLVM_CLANG_LEX_EXTERNALPREPROCESSORSOURCE_H
 
 namespace clang {
 
 class IdentifierInfo;
+class Module;
 
 /// \brief Abstract interface for external sources of preprocessor 
 /// information.
@@ -32,8 +33,11 @@ public:
   
   /// \brief Update an out-of-date identifier.
   virtual void updateOutOfDateIdentifier(IdentifierInfo &II) = 0;
+
+  /// \brief Map a module ID to a module.
+  virtual Module *getModule(unsigned ModuleID) = 0;
 };
   
 }
 
-#endif // LLVM_CLANG_LEX_EXTERNAL_PREPROCESSOR_SOURCE_H
+#endif

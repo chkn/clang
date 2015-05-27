@@ -58,7 +58,7 @@ PreprocessorLexer *Preprocessor::getCurrentFileLexer() const {
     if (IsFileLexer(ISI))
       return ISI.ThePPLexer;
   }
-  return 0;
+  return nullptr;
 }
 
 
@@ -117,7 +117,7 @@ void Preprocessor::EnterSourceFileWithLexer(Lexer *TheLexer,
   CurLexer.reset(TheLexer);
   CurPPLexer = TheLexer;
   CurDirLookup = CurDir;
-  CurSubmodule = 0;
+  CurSubmodule = nullptr;
   if (CurLexerKind != CLK_LexAfterModuleImport)
     CurLexerKind = CLK_Lexer;
   
@@ -142,7 +142,7 @@ void Preprocessor::EnterSourceFileWithPTH(PTHLexer *PL,
   CurDirLookup = CurDir;
   CurPTHLexer.reset(PL);
   CurPPLexer = CurPTHLexer.get();
-  CurSubmodule = 0;
+  CurSubmodule = nullptr;
   if (CurLexerKind != CLK_LexAfterModuleImport)
     CurLexerKind = CLK_PTHLexer;
   
@@ -160,17 +160,17 @@ void Preprocessor::EnterSourceFileWithPTH(PTHLexer *PL,
 /// tokens from it instead of the current buffer.
 void Preprocessor::EnterMacro(Token &Tok, SourceLocation ILEnd,
                               MacroInfo *Macro, MacroArgs *Args) {
-  TokenLexer *TokLexer;
+  std::unique_ptr<TokenLexer> TokLexer;
   if (NumCachedTokenLexers == 0) {
-    TokLexer = new TokenLexer(Tok, ILEnd, Macro, Args, *this);
+    TokLexer = llvm::make_unique<TokenLexer>(Tok, ILEnd, Macro, Args, *this);
   } else {
-    TokLexer = TokenLexerCache[--NumCachedTokenLexers];
+    TokLexer = std::move(TokenLexerCache[--NumCachedTokenLexers]);
     TokLexer->Init(Tok, ILEnd, Macro, Args);
   }
 
   PushIncludeMacroStack();
-  CurDirLookup = 0;
-  CurTokenLexer.reset(TokLexer);
+  CurDirLookup = nullptr;
+  CurTokenLexer = std::move(TokLexer);
   if (CurLexerKind != CLK_LexAfterModuleImport)
     CurLexerKind = CLK_TokenLexer;
 }
@@ -190,20 +190,39 @@ void Preprocessor::EnterMacro(Token &Tok, SourceLocation ILEnd,
 void Preprocessor::EnterTokenStream(const Token *Toks, unsigned NumToks,
                                     bool DisableMacroExpansion,
                                     bool OwnsTokens) {
+  if (CurLexerKind == CLK_CachingLexer) {
+    if (CachedLexPos < CachedTokens.size()) {
+      // We're entering tokens into the middle of our cached token stream. We
+      // can't represent that, so just insert the tokens into the buffer.
+      CachedTokens.insert(CachedTokens.begin() + CachedLexPos,
+                          Toks, Toks + NumToks);
+      if (OwnsTokens)
+        delete [] Toks;
+      return;
+    }
+
+    // New tokens are at the end of the cached token sequnece; insert the
+    // token stream underneath the caching lexer.
+    ExitCachingLexMode();
+    EnterTokenStream(Toks, NumToks, DisableMacroExpansion, OwnsTokens);
+    EnterCachingLexMode();
+    return;
+  }
+
   // Create a macro expander to expand from the specified token stream.
-  TokenLexer *TokLexer;
+  std::unique_ptr<TokenLexer> TokLexer;
   if (NumCachedTokenLexers == 0) {
-    TokLexer = new TokenLexer(Toks, NumToks, DisableMacroExpansion,
-                              OwnsTokens, *this);
+    TokLexer = llvm::make_unique<TokenLexer>(
+        Toks, NumToks, DisableMacroExpansion, OwnsTokens, *this);
   } else {
-    TokLexer = TokenLexerCache[--NumCachedTokenLexers];
+    TokLexer = std::move(TokenLexerCache[--NumCachedTokenLexers]);
     TokLexer->Init(Toks, NumToks, DisableMacroExpansion, OwnsTokens);
   }
 
   // Save our current state.
   PushIncludeMacroStack();
-  CurDirLookup = 0;
-  CurTokenLexer.reset(TokLexer);
+  CurDirLookup = nullptr;
+  CurTokenLexer = std::move(TokLexer);
   if (CurLexerKind != CLK_LexAfterModuleImport)
     CurLexerKind = CLK_TokenLexer;
 }
@@ -284,9 +303,13 @@ bool Preprocessor::HandleEndOfFile(Token &Result, bool isEndOfMacro) {
       if (const FileEntry *FE =
             SourceMgr.getFileEntryForID(CurPPLexer->getFileID())) {
         HeaderInfo.SetFileControllingMacro(FE, ControllingMacro);
+        if (MacroInfo *MI =
+              getMacroInfo(const_cast<IdentifierInfo*>(ControllingMacro))) {
+          MI->UsedForHeaderGuard = true;
+        }
         if (const IdentifierInfo *DefinedMacro =
               CurPPLexer->MIOpt.GetDefinedMacro()) {
-          if (!ControllingMacro->hasMacroDefinition() &&
+          if (!isMacroDefined(ControllingMacro) &&
               DefinedMacro != ControllingMacro &&
               HeaderInfo.FirstTimeLexingFile(FE)) {
 
@@ -350,7 +373,7 @@ bool Preprocessor::HandleEndOfFile(Token &Result, bool isEndOfMacro) {
         CurPTHLexer.reset();
       }
 
-      CurPPLexer = 0;
+      CurPPLexer = nullptr;
       return true;
     }
 
@@ -377,6 +400,9 @@ bool Preprocessor::HandleEndOfFile(Token &Result, bool isEndOfMacro) {
       CurLexer->FormTokenWithChars(Result, EndPos, tok::annot_module_end);
       Result.setAnnotationEndLoc(Result.getLocation());
       Result.setAnnotationValue(CurSubmodule);
+
+      // We're done with this submodule.
+      LeaveSubmodule();
     }
 
     // We're done with the #included file.
@@ -425,13 +451,17 @@ bool Preprocessor::HandleEndOfFile(Token &Result, bool isEndOfMacro) {
   }
   
   if (!isIncrementalProcessingEnabled())
-    CurPPLexer = 0;
+    CurPPLexer = nullptr;
 
-  // This is the end of the top-level file. 'WarnUnusedMacroLocs' has collected
-  // all macro locations that we need to warn because they are not used.
-  for (WarnUnusedMacroLocsTy::iterator
-         I=WarnUnusedMacroLocs.begin(), E=WarnUnusedMacroLocs.end(); I!=E; ++I)
-    Diag(*I, diag::pp_macro_not_used);
+  if (TUKind == TU_Complete) {
+    // This is the end of the top-level file. 'WarnUnusedMacroLocs' has
+    // collected all macro locations that we need to warn because they are not
+    // used.
+    for (WarnUnusedMacroLocsTy::iterator
+           I=WarnUnusedMacroLocs.begin(), E=WarnUnusedMacroLocs.end();
+           I!=E; ++I)
+      Diag(*I, diag::pp_macro_not_used);
+  }
 
   // If we are building a module that has an umbrella header, make sure that
   // each of the headers within the directory covered by the umbrella header
@@ -441,26 +471,25 @@ bool Preprocessor::HandleEndOfFile(Token &Result, bool isEndOfMacro) {
       SourceLocation StartLoc
         = SourceMgr.getLocForStartOfFile(SourceMgr.getMainFileID());
 
-      if (getDiagnostics().getDiagnosticLevel(
-            diag::warn_uncovered_module_header, 
-            StartLoc) != DiagnosticsEngine::Ignored) {
+      if (!getDiagnostics().isIgnored(diag::warn_uncovered_module_header,
+                                      StartLoc)) {
         ModuleMap &ModMap = getHeaderSearchInfo().getModuleMap();
-        typedef llvm::sys::fs::recursive_directory_iterator
-          recursive_directory_iterator;
-        const DirectoryEntry *Dir = Mod->getUmbrellaDir();
-        llvm::error_code EC;
-        for (recursive_directory_iterator Entry(Dir->getName(), EC), End;
+        const DirectoryEntry *Dir = Mod->getUmbrellaDir().Entry;
+        vfs::FileSystem &FS = *FileMgr.getVirtualFileSystem();
+        std::error_code EC;
+        for (vfs::recursive_directory_iterator Entry(FS, Dir->getName(), EC), End;
              Entry != End && !EC; Entry.increment(EC)) {
           using llvm::StringSwitch;
           
           // Check whether this entry has an extension typically associated with
           // headers.
-          if (!StringSwitch<bool>(llvm::sys::path::extension(Entry->path()))
+          if (!StringSwitch<bool>(llvm::sys::path::extension(Entry->getName()))
                  .Cases(".h", ".H", ".hh", ".hpp", true)
                  .Default(false))
             continue;
 
-          if (const FileEntry *Header = getFileManager().getFile(Entry->path()))
+          if (const FileEntry *Header =
+                  getFileManager().getFile(Entry->getName()))
             if (!getSourceManager().hasFileInfo(Header)) {
               if (!ModMap.isHeaderInUnavailableModule(Header)) {
                 // Find the relative path that would access this header.
@@ -470,34 +499,6 @@ bool Preprocessor::HandleEndOfFile(Token &Result, bool isEndOfMacro) {
                   << Mod->getFullModuleName() << RelativePath;
               }
             }
-        }
-      }
-    }
-
-    // Check whether there are any headers that were included, but not
-    // mentioned at all in the module map. Such headers 
-    SourceLocation StartLoc
-      = SourceMgr.getLocForStartOfFile(SourceMgr.getMainFileID());
-    if (getDiagnostics().getDiagnosticLevel(diag::warn_forgotten_module_header,
-                                            StartLoc)
-          != DiagnosticsEngine::Ignored) {
-      ModuleMap &ModMap = getHeaderSearchInfo().getModuleMap();
-      for (unsigned I = 0, N = SourceMgr.local_sloc_entry_size(); I != N; ++I) {
-        // We only care about file entries.
-        const SrcMgr::SLocEntry &Entry = SourceMgr.getLocalSLocEntry(I);
-        if (!Entry.isFile())
-          continue;
-
-        // Dig out the actual file.
-        const FileEntry *File = Entry.getFile().getContentCache()->OrigEntry;
-        if (!File)
-          continue;
-
-        // If it's not part of a module and not unknown, complain.
-        if (!ModMap.findModuleForHeader(File) &&
-            !ModMap.isHeaderInUnavailableModule(File)) {
-          Diag(StartLoc, diag::warn_forgotten_module_header)
-            << File->getName() << Mod->getFullModuleName();
         }
       }
     }
@@ -520,7 +521,7 @@ bool Preprocessor::HandleEndOfTokenLexer(Token &Result) {
   if (NumCachedTokenLexers == TokenLexerCacheSize)
     CurTokenLexer.reset();
   else
-    TokenLexerCache[NumCachedTokenLexers++] = CurTokenLexer.take();
+    TokenLexerCache[NumCachedTokenLexers++] = std::move(CurTokenLexer);
 
   // Handle this like a #include file being popped off the stack.
   return HandleEndOfFile(Result, true);
@@ -537,7 +538,7 @@ void Preprocessor::RemoveTopOfLexerStack() {
     if (NumCachedTokenLexers == TokenLexerCacheSize)
       CurTokenLexer.reset();
     else
-      TokenLexerCache[NumCachedTokenLexers++] = CurTokenLexer.take();
+      TokenLexerCache[NumCachedTokenLexers++] = std::move(CurTokenLexer);
   }
 
   PopIncludeMacroStack();
@@ -553,11 +554,11 @@ void Preprocessor::HandleMicrosoftCommentPaste(Token &Tok) {
   // We handle this by scanning for the closest real lexer, switching it to
   // raw mode and preprocessor mode.  This will cause it to return \n as an
   // explicit EOD token.
-  PreprocessorLexer *FoundLexer = 0;
+  PreprocessorLexer *FoundLexer = nullptr;
   bool LexerWasInPPMode = false;
   for (unsigned i = 0, e = IncludeMacroStack.size(); i != e; ++i) {
     IncludeStackInfo &ISI = *(IncludeMacroStack.end()-i-1);
-    if (ISI.ThePPLexer == 0) continue;  // Scan for a real lexer.
+    if (ISI.ThePPLexer == nullptr) continue;  // Scan for a real lexer.
 
     // Once we find a real lexer, mark it as raw mode (disabling macro
     // expansions) and preprocessor mode (return EOD).  We know that the lexer
@@ -606,4 +607,124 @@ void Preprocessor::HandleMicrosoftCommentPaste(Token &Tok) {
   // active (an active lexer would return EOD at EOF if there was no \n in
   // preprocessor directive mode), so just return EOF as our token.
   assert(!FoundLexer && "Lexer should return EOD before EOF in PP mode");
+}
+
+void Preprocessor::EnterSubmodule(Module *M, SourceLocation ImportLoc) {
+  // Save the current state for future imports.
+  BuildingSubmoduleStack.push_back(BuildingSubmoduleInfo(M, ImportLoc));
+  auto &Info = BuildingSubmoduleStack.back();
+  Info.Macros.swap(Macros);
+  // Save our visible modules set. This is guaranteed to clear the set.
+  if (getLangOpts().ModulesLocalVisibility) {
+    Info.VisibleModules = std::move(VisibleModules);
+
+    // Resolve as much of the module definition as we can now, before we enter
+    // one if its headers.
+    // FIXME: Can we enable Complain here?
+    ModuleMap &ModMap = getHeaderSearchInfo().getModuleMap();
+    ModMap.resolveExports(M, /*Complain=*/false);
+    ModMap.resolveUses(M, /*Complain=*/false);
+    ModMap.resolveConflicts(M, /*Complain=*/false);
+
+    // This module is visible to itself.
+    makeModuleVisible(M, ImportLoc);
+  }
+
+  // Determine the set of starting macros for this submodule.
+  // FIXME: If we re-enter a submodule, should we restore its MacroDirectives?
+  auto &StartingMacros = getLangOpts().ModulesLocalVisibility
+                             ? BuildingSubmoduleStack[0].Macros
+                             : Info.Macros;
+
+  // Restore to the starting state.
+  // FIXME: Do this lazily, when each macro name is first referenced.
+  for (auto &Macro : StartingMacros) {
+    MacroState MS(Macro.second.getLatest());
+    MS.setOverriddenMacros(*this, Macro.second.getOverriddenMacros());
+    Macros.insert(std::make_pair(Macro.first, std::move(MS)));
+  }
+}
+
+void Preprocessor::LeaveSubmodule() {
+  auto &Info = BuildingSubmoduleStack.back();
+
+  Module *LeavingMod = Info.M;
+  SourceLocation ImportLoc = Info.ImportLoc;
+
+  // Create ModuleMacros for any macros defined in this submodule.
+  for (auto &Macro : Macros) {
+    auto *II = const_cast<IdentifierInfo*>(Macro.first);
+    auto &OuterInfo = Info.Macros[II];
+
+    // Find the starting point for the MacroDirective chain in this submodule.
+    auto *OldMD = OuterInfo.getLatest();
+    if (getLangOpts().ModulesLocalVisibility &&
+        BuildingSubmoduleStack.size() > 1) {
+      auto &PredefMacros = BuildingSubmoduleStack[0].Macros;
+      auto PredefMacroIt = PredefMacros.find(Macro.first);
+      if (PredefMacroIt == PredefMacros.end())
+        OldMD = nullptr;
+      else
+        OldMD = PredefMacroIt->second.getLatest();
+    }
+
+    // This module may have exported a new macro. If so, create a ModuleMacro
+    // representing that fact.
+    bool ExplicitlyPublic = false;
+    for (auto *MD = Macro.second.getLatest(); MD != OldMD;
+         MD = MD->getPrevious()) {
+      assert(MD && "broken macro directive chain");
+
+      // Stop on macros defined in other submodules we #included along the way.
+      // There's no point doing this if we're tracking local submodule
+      // visibility, since there can be no such directives in our list.
+      if (!getLangOpts().ModulesLocalVisibility) {
+        Module *Mod = getModuleContainingLocation(MD->getLocation());
+        if (Mod != LeavingMod)
+          break;
+      }
+
+      if (auto *VisMD = dyn_cast<VisibilityMacroDirective>(MD)) {
+        // The latest visibility directive for a name in a submodule affects
+        // all the directives that come before it.
+        if (VisMD->isPublic())
+          ExplicitlyPublic = true;
+        else if (!ExplicitlyPublic)
+          // Private with no following public directive: not exported.
+          break;
+      } else {
+        MacroInfo *Def = nullptr;
+        if (DefMacroDirective *DefMD = dyn_cast<DefMacroDirective>(MD))
+          Def = DefMD->getInfo();
+
+        // FIXME: Issue a warning if multiple headers for the same submodule
+        // define a macro, rather than silently ignoring all but the first.
+        bool IsNew;
+        // Don't bother creating a module macro if it would represent a #undef
+        // that doesn't override anything.
+        if (Def || !Macro.second.getOverriddenMacros().empty())
+          addModuleMacro(LeavingMod, II, Def,
+                         Macro.second.getOverriddenMacros(), IsNew);
+        break;
+      }
+    }
+
+    // Maintain a single macro directive chain if we're not tracking
+    // per-submodule macro visibility.
+    if (!getLangOpts().ModulesLocalVisibility)
+      OuterInfo.setLatest(Macro.second.getLatest());
+  }
+
+  // Put back the old macros.
+  std::swap(Info.Macros, Macros);
+
+  if (getLangOpts().ModulesLocalVisibility)
+    VisibleModules = std::move(Info.VisibleModules);
+
+  BuildingSubmoduleStack.pop_back();
+
+  // A nested #include makes the included submodule visible.
+  if (!BuildingSubmoduleStack.empty() ||
+      !getLangOpts().ModulesLocalVisibility)
+    makeModuleVisible(LeavingMod, ImportLoc);
 }

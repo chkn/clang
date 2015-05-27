@@ -518,3 +518,24 @@ F x;
 // CHECK-DAG: @"\01??_8F@Test28@@7BD@1@@" =
 // CHECK-DAG: @"\01??_8F@Test28@@7BE@1@@" =
 }
+
+namespace Test29 {
+struct A {};
+struct B : virtual A {};
+struct C : virtual B {};
+struct D : C {};
+D d;
+
+// CHECK-DAG: @"\01??_8D@Test29@@7BB@1@@" = linkonce_odr unnamed_addr constant [2 x i32] zeroinitializer
+}
+
+namespace Test30 {
+struct A {};
+template <class> struct B : virtual A {
+  B() {}
+};
+
+extern template class B<int>;
+template B<int>::B();
+// CHECK-DAG: @"\01??_8?$B@H@Test30@@7B@" = external unnamed_addr constant [2 x i32]{{$}}
+}

@@ -9,6 +9,14 @@ public:
   ~X();
 };
 
+template<typename T> struct Y {
+  Y();
+  static Y f() {
+    Y y;
+    return y;
+  }
+};
+
 // CHECK-LABEL: define void @_Z5test0v
 // CHECK-EH-LABEL: define void @_Z5test0v
 X test0() {
@@ -46,16 +54,22 @@ X test2(bool B) {
   return x;
 
   // CHECK: call {{.*}} @_ZN1XC1Ev
+  // CHECK-NEXT: {{.*}} getelementptr inbounds %class.X, %class.X* %y, i32 0, i32 0
+  // CHECK-NEXT: call void @llvm.lifetime.start
   // CHECK-NEXT: call {{.*}} @_ZN1XC1Ev
   // CHECK: call {{.*}} @_ZN1XC1ERKS_
   // CHECK: call {{.*}} @_ZN1XC1ERKS_
   // CHECK: call {{.*}} @_ZN1XD1Ev
+  // CHECK-NEXT: call void @llvm.lifetime.end
   // CHECK: call {{.*}} @_ZN1XD1Ev
+  // CHECK-NEXT: call void @llvm.lifetime.end
   // CHECK: ret void
 
   // The block ordering in the -fexceptions IR is unfortunate.
 
-  // CHECK-EH:      call {{.*}} @_ZN1XC1Ev
+  // CHECK-EH:      call void @llvm.lifetime.start
+  // CHECK-EH-NEXT: call {{.*}} @_ZN1XC1Ev
+  // CHECK-EH:      call void @llvm.lifetime.start
   // CHECK-EH-NEXT: invoke {{.*}} @_ZN1XC1Ev
   // -> %invoke.cont, %lpad
 
@@ -88,7 +102,9 @@ X test2(bool B) {
   // -> %invoke.cont11, %lpad
 
   // %invoke.cont11: normal cleanup for 'x'
-  // CHECK-EH:      call {{.*}} @_ZN1XD1Ev
+  // CHECK-EH:      call void @llvm.lifetime.end
+  // CHECK-EH-NEXT: call {{.*}} @_ZN1XD1Ev
+  // CHECK-EH-NEXT: call void @llvm.lifetime.end
   // CHECK-EH-NEXT: ret void
 
   // %eh.cleanup:  EH cleanup for 'x'
@@ -108,12 +124,17 @@ X test2(bool B) {
 
 }
 
+// CHECK-LABEL: define void @_Z5test3b
 X test3(bool B) {
-  // FIXME: We don't manage to apply NRVO here, although we could.
-  {
+  // CHECK: tail call {{.*}} @_ZN1XC1Ev
+  // CHECK-NOT: call {{.*}} @_ZN1XC1ERKS_
+  // CHECK: call {{.*}} @_ZN1XC1Ev
+  // CHECK: call {{.*}} @_ZN1XC1ERKS_
+  if (B) {
     X y;
     return y;
   }
+  // FIXME: we should NRVO this variable too.
   X x;
   return x;
 }
@@ -155,10 +176,44 @@ X test6() {
   X a __attribute__((aligned(8)));
   return a;
   // CHECK:      [[A:%.*]] = alloca [[X:%.*]], align 8
+  // CHECK-NEXT: [[PTR:%.*]] = getelementptr inbounds %class.X, %class.X* [[A]], i32 0, i32 0
+  // CHECK-NEXT: call void @llvm.lifetime.start(i64 1, i8* [[PTR]])
   // CHECK-NEXT: call {{.*}} @_ZN1XC1Ev([[X]]* [[A]])
-  // CHECK-NEXT: call {{.*}} @_ZN1XC1ERKS_([[X]]* {{%.*}}, [[X]]* [[A]])
+  // CHECK-NEXT: call {{.*}} @_ZN1XC1ERKS_([[X]]* {{%.*}}, [[X]]* dereferenceable({{[0-9]+}}) [[A]])
   // CHECK-NEXT: call {{.*}} @_ZN1XD1Ev([[X]]* [[A]])
+  // CHECK-NEXT: call void @llvm.lifetime.end(i64 1, i8* [[PTR]])
   // CHECK-NEXT: ret void
 }
+
+// CHECK-LABEL: define void @_Z5test7b
+X test7(bool b) {
+  // CHECK: tail call {{.*}} @_ZN1XC1Ev
+  // CHECK-NEXT: ret
+  if (b) {
+    X x;
+    return x;
+  }
+  return X();
+}
+
+// CHECK-LABEL: define void @_Z5test8b
+X test8(bool b) {
+  // CHECK: tail call {{.*}} @_ZN1XC1Ev
+  // CHECK-NEXT: ret
+  if (b) {
+    X x;
+    return x;
+  } else {
+    X y;
+    return y;
+  }
+}
+
+Y<int> test9() {
+  Y<int>::f();
+}
+
+// CHECK-LABEL: define linkonce_odr void @_ZN1YIiE1fEv
+// CHECK: tail call {{.*}} @_ZN1YIiEC1Ev
 
 // CHECK-EH: attributes [[NR_NUW]] = { noreturn nounwind }

@@ -163,7 +163,7 @@ def act_on_decl(declaration, comment, allowed_types):
     m = re.match(""".*AST_TYPE(LOC)?_TRAVERSE_MATCHER\(
                        \s*([^\s,]+\s*),
                        \s*(?:[^\s,]+\s*),
-                       \s*AST_POLYMORPHIC_SUPPORTED_TYPES_([^(]*)\(([^)]*)\)
+                       \s*AST_POLYMORPHIC_SUPPORTED_TYPES\(([^)]*)\)
                      \)\s*;\s*$""", declaration, flags=re.X)
     if m:
       loc, name, n_results, results = m.groups()[0:4]
@@ -182,7 +182,7 @@ def act_on_decl(declaration, comment, allowed_types):
 
     m = re.match(r"""^\s*AST_POLYMORPHIC_MATCHER(_P)?(.?)(?:_OVERLOAD)?\(
                           \s*([^\s,]+)\s*,
-                          \s*AST_POLYMORPHIC_SUPPORTED_TYPES_([^(]*)\(([^)]*)\)
+                          \s*AST_POLYMORPHIC_SUPPORTED_TYPES\(([^)]*)\)
                        (?:,\s*([^\s,]+)\s*
                           ,\s*([^\s,]+)\s*)?
                        (?:,\s*([^\s,]+)\s*
@@ -202,6 +202,25 @@ def act_on_decl(declaration, comment, allowed_types):
                        for i in range(0, len(args), 2) if args[i])
       for result_type in result_types:
         add_matcher(result_type, name, args, comment)
+      return
+
+    m = re.match(r"""^\s*AST_MATCHER_FUNCTION(_P)?(.?)(?:_OVERLOAD)?\(
+                       (?:\s*([^\s,]+)\s*,)?
+                          \s*([^\s,]+)\s*
+                       (?:,\s*([^\s,]+)\s*
+                          ,\s*([^\s,]+)\s*)?
+                       (?:,\s*([^\s,]+)\s*
+                          ,\s*([^\s,]+)\s*)?
+                       (?:,\s*\d+\s*)?
+                      \)\s*{\s*$""", declaration, flags=re.X)
+    if m:
+      p, n, result, name = m.groups()[0:4]
+      args = m.groups()[4:]
+      if n not in ['', '2']:
+        raise Exception('Cannot parse "%s"' % declaration)
+      args = ', '.join('%s %s' % (args[i], args[i+1])
+                       for i in range(0, len(args), 2) if args[i])
+      add_matcher(result, name, args, comment)
       return
 
     m = re.match(r"""^\s*AST_MATCHER(_P)?(.?)(?:_OVERLOAD)?\(

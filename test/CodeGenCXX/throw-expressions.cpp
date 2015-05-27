@@ -34,7 +34,7 @@ int test5(bool x, bool y, int z) {
 // CHECK: br i1
 //
 // y.true:
-// CHECK: load i32*
+// CHECK: load i32, i32*
 // CHECK: br label
 //
 // y.false:
@@ -58,7 +58,7 @@ int test6(bool x, bool y, int z) {
 // CHECK: br i1
 //
 // y.true:
-// CHECK: load i32*
+// CHECK: load i32, i32*
 // CHECK: br label
 //
 // y.false:
@@ -79,4 +79,36 @@ namespace DR1560 {
   // CHECK-NOT: call {{.*}}@_ZN6DR15601AD1Ev
   // CHECK: call {{.*}} @__cxa_atexit({{.*}} @_ZN6DR15601AD1Ev {{.*}} @_ZGRN6DR15601rE
   // CHECK-NOT: call {{.*}}@_ZN6DR15601AD1Ev
+}
+
+// CHECK-LABEL: define void @_Z5test7b(
+void test7(bool cond) {
+  // CHECK: br i1
+  //
+  // x.true:
+  // CHECK: call void @__cxa_throw(
+  // CHECK-NEXT: unreachable
+  //
+  // x.false:
+  // CHECK: br label
+  //
+  // end:
+  // CHECK: ret void
+  cond ? throw test7 : val;
+}
+
+// CHECK-LABEL: define dereferenceable(4) i32* @_Z5test8b(
+int &test8(bool cond) {
+  // CHECK: br i1
+  //
+  // x.true:
+  // CHECK: br label
+  //
+  // x.false:
+  // CHECK: call void @__cxa_throw(
+  // CHECK-NEXT: unreachable
+  //
+  // end:
+  // CHECK: ret i32* @val
+  return cond ? val : ((throw "foo"));
 }
