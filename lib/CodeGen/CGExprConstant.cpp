@@ -1350,8 +1350,14 @@ static llvm::Constant *EmitNullConstant(CodeGenModule &CGM,
     }
 
     // For unions, stop after the first named field.
-    if (record->isUnion() && Field->getDeclName())
-      break;
+    if (record->isUnion()) {
+      if (Field->getIdentifier())
+        break;
+      if (const auto *FieldRD =
+              dyn_cast_or_null<RecordDecl>(Field->getType()->getAsTagDecl()))
+        if (FieldRD->findFirstNamedDataMember())
+          break;
+    }
   }
 
   // Fill in the virtual bases, if we're working with the complete object.
@@ -1409,10 +1415,6 @@ llvm::Constant *CodeGenModule::EmitNullConstant(QualType T) {
 
     llvm::Constant *Element = EmitNullConstant(ElementTy);
     unsigned NumElements = CAT->getSize().getZExtValue();
-    
-    if (Element->isNullValue())
-      return llvm::ConstantAggregateZero::get(ATy);
-    
     SmallVector<llvm::Constant *, 8> Array(NumElements, Element);
     return llvm::ConstantArray::get(ATy, Array);
   }
