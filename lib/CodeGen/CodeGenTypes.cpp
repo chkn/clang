@@ -682,7 +682,7 @@ void CodeGenTypes::ComputeCLIRecordTypeMetadata(llvm::Type *Ty,
   CLIGenericData *GenericData = CLIData->getGenericData();
   if (!GenericData) return;
 
-  llvm::SmallVector<llvm::Value *, 1> Types;
+  llvm::SmallVector<llvm::Metadata *, 1> Types;
 
   if (const ClassTemplateSpecializationDecl *TD
                           = dyn_cast<ClassTemplateSpecializationDecl>(RD)) {
@@ -690,7 +690,8 @@ void CodeGenTypes::ComputeCLIRecordTypeMetadata(llvm::Type *Ty,
     for (unsigned I = 0, E = TAL.size(); I != E; ++I) {
       const TemplateArgument &Arg = TAL[I];
       llvm::Type *ArgTy = ConvertType(Arg.getAsType());
-      llvm::Value *Value = llvm::ConstantPointerNull::get(ArgTy->getPointerTo());
+      llvm::Metadata *Value = llvm::ConstantAsMetadata::get(
+        llvm::ConstantPointerNull::get(ArgTy->getPointerTo()));
       Types.push_back(Value);
     }
   }

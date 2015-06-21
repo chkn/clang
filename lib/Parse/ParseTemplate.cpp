@@ -1213,7 +1213,7 @@ bool Parser::IsTemplateArgumentList(unsigned Skip, unsigned *NumArgs) {
     return true;
   
   // See whether we have declaration specifiers, which indicate a type.
-  while (isCXXDeclarationSpecifier() == TPResult::True)
+  while (isCXXDeclarationSpecifier() == TPResult::True) {
     ConsumeToken();
     // We need to know the number of template arguments for C++/CLI
     if (NumArgs)

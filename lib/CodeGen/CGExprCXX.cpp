@@ -1441,15 +1441,15 @@ llvm::Value *CodeGenFunction::EmitCLIGCNewExpr(const CLIGCNewExpr *E) {
     CallArgList Args;
     EmitCallArgs(Args, FPT, CCE->arg_begin(), CCE->arg_end());
   
-    CXXCtorType CtorType = Ctor_Base;
-    const CGFunctionInfo &CGInfo = CGM.getTypes().arrangeCXXConstructorDeclaration(
+    StructorType CtorType = StructorType::Base;
+    const CGFunctionInfo &CGInfo = CGM.getTypes().arrangeCXXStructorDeclaration(
       CD, CtorType);
-    llvm::Value *Callee = CGM.GetAddrOfCXXConstructor(CD, CtorType);
+    llvm::Value *Callee = CGM.getAddrOfCXXStructor(CD, CtorType);
 
     EmitCall(CGInfo, Callee, ReturnValueSlot(), Args, CD);
 
     llvm::Value* CallInst = Builder.CreateCall(CGM.getIntrinsic(
-      llvm::Intrinsic::cil_newobj));
+		llvm::Intrinsic::cil_newobj), {});
 
     return Builder.CreateBitCast(CallInst, DstTy);
   } else {

@@ -39,6 +39,8 @@ namespace clang {
   class QualType;
   class FunctionDecl;
   class TypeSourceInfo;
+  class CXXRecordDecl;
+  class CXXMethodDecl;
 
 /// Attr - This represents one attribute.
 class Attr {

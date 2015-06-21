@@ -83,7 +83,7 @@ class SemaPPCallbacks : public PPCallbacks {
                               const Token &UsingTok,
                               StringRef FileName,
                               bool IsAngled,
-                              CharSourceRange FilenameRange) LLVM_OVERRIDE;
+                              CharSourceRange FilenameRange) override;
 
 public:
   SemaPPCallbacks(Sema &S) : S(S) {}
@@ -98,7 +98,7 @@ void SemaPPCallbacks::UsingDirective(SourceLocation HashLoc,
   const DirectoryLookup *CurDir;
   //TODO!!!
   const FileEntry *File = S.getPreprocessor().LookupFile(HashLoc, 
-      FileName, IsAngled, 0, CurDir, NULL, NULL, 0);
+      FileName, IsAngled, nullptr, nullptr, CurDir, nullptr, nullptr, nullptr);
 
   // If the file is still not found, just go with the vanilla diagnostic
   if (!File) {
@@ -296,8 +296,7 @@ void Sema::Initialize() {
     PushOnScopeChains(Context.getBuiltinVaListDecl(), TUScope);
 
   if (getLangOpts().CPlusPlusCLI) {
-    SemaPPCallbacks *SemaPP = new SemaPPCallbacks(*this);
-    getPreprocessor().addPPCallbacks(SemaPP);
+    getPreprocessor().addPPCallbacks(std::make_unique<SemaPPCallbacks>(*this));
 
     assert(!CLIContext && "CLI context should not be initialized");
     CLIContext = new CLISemaContext();

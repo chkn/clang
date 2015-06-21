@@ -6611,10 +6611,10 @@ InitializationSequence::Perform(Sema &S,
       if (!TSInfo)
         TSInfo = S.Context.getTrivialTypeSourceInfo(Step->Type,
                                                     Kind.getRange().getBegin());
-      CurInit = S.Owned(new (S.Context) CLIValueClassInitExpr(TSInfo->getType(),
-                                                              TSInfo,
-                                                              CLI_VCIK_ZeroInit,
-                                                              /*InitExpr=*/0));
+      CurInit = new (S.Context) CLIValueClassInitExpr(TSInfo->getType(),
+                                                      TSInfo,
+                                                      CLI_VCIK_ZeroInit,
+                                                      /*InitExpr=*/0);
       break;
     }
 
@@ -6623,10 +6623,10 @@ InitializationSequence::Perform(Sema &S,
       if (!TSInfo)
         TSInfo = S.Context.getTrivialTypeSourceInfo(Step->Type,
                                                     Kind.getRange().getBegin());
-      CurInit = S.Owned(new (S.Context) CLIValueClassInitExpr(TSInfo->getType(),
-                                                              TSInfo,
-                                                              CLI_VCIK_CopyInit,
-                                                              Step->InitExpr));
+      CurInit = new (S.Context) CLIValueClassInitExpr(TSInfo->getType(),
+                                                      TSInfo,
+                                                      CLI_VCIK_CopyInit,
+                                                      Step->InitExpr);
       break;
     }
 
@@ -6640,7 +6640,7 @@ InitializationSequence::Perform(Sema &S,
                                               TSInfo,
                                               Kind.getRange(),
                                               (Expr *)Args[0], 0);
-      CurInit = NewExpr.take();
+      CurInit = NewExpr.get();
       break;
     }
 

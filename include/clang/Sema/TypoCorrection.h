@@ -173,7 +173,7 @@ public:
   /// as the only element in the list to mark this TypoCorrection as a keyword.
   void makeKeyword() {
     CorrectionDecls.clear();
-    CorrectionDecls.push_back(nullptr);
+    CorrectionDecls.push_back(static_cast<NamedDecl *>(nullptr));
     ForceSpecifierReplacement = true;
   }
 

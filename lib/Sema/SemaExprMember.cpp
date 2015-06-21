@@ -1246,13 +1246,13 @@ static ExprResult LookupMemberExpr(Sema &S, LookupResult &R,
     // Handle CLI properties access
     if (RTy->isCLIRecordType() && R.isSingleResult()) {
       if (CLIPropertyDecl *PD = dyn_cast<CLIPropertyDecl>(R.getFoundDecl())) {
-        return Owned(new (Context) CLIPropertyRefExpr(PD,
-                                                      R.getLookupNameInfo(),
-                                                      BaseExpr.get(),
-                                                      IsArrow,
-                                                      Context.PseudoObjectTy,
-                                                      VK_LValue,
-                                                      OK_CLIProperty));
+        return new (S.Context) CLIPropertyRefExpr(PD,
+                                                  R.getLookupNameInfo(),
+                                                  BaseExpr.get(),
+                                                  IsArrow,
+                                                  S.Context.PseudoObjectTy,
+                                                  VK_LValue,
+                                                  OK_CLIProperty);
       }
     }
 

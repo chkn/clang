@@ -3641,6 +3641,7 @@ public:
     addMinGWDefines(Opts, Builder);
   }
 };
+} // end anonymous namespace.
 
 namespace {
 // CLR (Common Language Runtime, .NET / Mono) target

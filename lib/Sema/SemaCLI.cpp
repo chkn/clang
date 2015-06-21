@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#pragma unmanaged
 #include "clang/Sema/Sema.h"
-#include "clang/Sema/SemaCLI.h"
 #include "clang/Sema/SemaInternal.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Scope.h"
@@ -23,6 +23,8 @@
 #include "clang/AST/CXXInheritance.h"
 #include "llvm/ADT/StringExtras.h"
 #include "TypeLocBuilder.h"
+#pragma managed
+#include "clang/Sema/SemaCLI.h"
 
 #using <System.dll>
 using namespace System;
@@ -409,7 +411,7 @@ static CLIRecordDecl * createClass(Sema &S, TypeDefinition^ TypeDef) {
   return RD;
 }
 
-static CLICustomAttribute* createAttribute(Sema &S, CustomAttribute ^AttrDef) {
+static CLICustomAttributeAttr* createAttribute(Sema &S, CustomAttribute ^AttrDef) {
   ASTContext &C = S.getASTContext();
   
   CXXRecordDecl *AttrClass = findCreateClassDecl(S, AttrDef->AttributeType);
@@ -418,12 +420,12 @@ static CLICustomAttribute* createAttribute(Sema &S, CustomAttribute ^AttrDef) {
   CXXMethodDecl *AttrCtor = findCreateMethod(S, AttrDef->Constructor->Resolve(),
     AttrClass);
 
-  CLICustomAttribute *Attr = new(C) CLICustomAttribute(SourceRange(), C,
+  CLICustomAttributeAttr *Attr = new(C) CLICustomAttributeAttr(SourceRange(), C,
     AttrClass, AttrCtor);
 
   if (AttrDef->HasConstructorArguments) {
     for each (CustomAttributeArgument Arg in AttrDef->ConstructorArguments) {
-      CLICustomAttribute::Argument A;
+      CLICustomAttributeAttr::Argument A;
       //A.Expression = Arg.Type;
       Attr->Arguments.push_back(A);
     }
@@ -431,7 +433,7 @@ static CLICustomAttribute* createAttribute(Sema &S, CustomAttribute ^AttrDef) {
 
   if (AttrDef->HasFields) {
     for each (CustomAttributeNamedArgument Arg in AttrDef->Fields) {
-      CLICustomAttribute::Argument A;
+      CLICustomAttributeAttr::Argument A;
       A.Name = marshalString<E_UTF8>(Arg.Name);
       //A.Expression = Arg.Type;
       Attr->Arguments.push_back(A);
@@ -440,7 +442,7 @@ static CLICustomAttribute* createAttribute(Sema &S, CustomAttribute ^AttrDef) {
 
   if (AttrDef->HasProperties) {
     for each (CustomAttributeNamedArgument Arg in AttrDef->Properties) {
-      CLICustomAttribute::Argument A;
+      CLICustomAttributeAttr::Argument A;
       A.Name = marshalString<E_UTF8>(Arg.Name);
       //A.Expression = Arg.Type;
       Attr->Arguments.push_back(A);
@@ -453,7 +455,7 @@ static CLICustomAttribute* createAttribute(Sema &S, CustomAttribute ^AttrDef) {
 static void createDeclAttributes(Sema &S, CustomAttributeCollection ^Attributes,
                                  Decl *D) {
   for each (CustomAttribute ^Attr in Attributes) {
-    CLICustomAttribute *CLIAttr = createAttribute(S, Attr);
+    CLICustomAttributeAttr *CLIAttr = createAttribute(S, Attr);
     D->addAttr(CLIAttr);
   }
 }
@@ -1237,7 +1239,7 @@ bool Sema::CheckHandleConversion(Expr *From, QualType ToType,
   return true;
 }
 
-ActionResult<CLICustomAttribute*> Sema::ActOnCLIAttribute(Scope *S,
+ActionResult<CLICustomAttributeAttr*> Sema::ActOnCLIAttribute(Scope *S,
                                               CLIAttributeTarget Target,
                                                   SourceLocation TargetLoc,
                                                        StringRef AttributeName,
@@ -1276,7 +1278,7 @@ ActionResult<CLICustomAttribute*> Sema::ActOnCLIAttribute(Scope *S,
     return true;
   }
 
-  CLICustomAttribute *Attr = new (Context) CLICustomAttribute(
+  CLICustomAttributeAttr *Attr = new (Context) CLICustomAttributeAttr(
     SourceRange(), Context, RD, /*FIXME: Ctor*/0);
 
   return Attr;
@@ -1291,9 +1293,9 @@ bool HasCLIParamArrayAttribute(Sema &S, const FunctionDecl *FD,
   auto PD = FD->getParamDecl(--Params);
   assert(PD && "Expected a valid parameter decl");
 
-  for (auto it = PD->specific_attr_begin<CLICustomAttribute>();
-       it != PD->specific_attr_end<CLICustomAttribute>(); ++it) {
-    CLICustomAttribute *CLIAttr = *it;
+  for (auto it = PD->specific_attr_begin<CLICustomAttributeAttr>();
+       it != PD->specific_attr_end<CLICustomAttributeAttr>(); ++it) {
+    CLICustomAttributeAttr *CLIAttr = *it;
     if (CLIAttr->Class == S.getCLIContext()->ParamArrayAttribute) {
       assert(isa<HandleType>(PD->getType()));
       ParamType = PD->getType();
@@ -1309,7 +1311,7 @@ Attr *Sema::InstantiateUnknownAttr(const Attr *At,
   switch (At->getKind()) {
     default: return 0;
     case attr::CLICustomAttribute: {
-      const CLICustomAttribute *A = cast<CLICustomAttribute>(At);
+      const CLICustomAttributeAttr *A = cast<CLICustomAttributeAttr>(At);
       return A->clone(Context);
     }
   }

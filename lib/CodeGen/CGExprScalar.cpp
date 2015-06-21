@@ -1453,7 +1453,7 @@ Value *ScalarExprEmitter::VisitCastExpr(CastExpr *CE) {
     assert(SL && "Expected a valid string literal");
 
     llvm::Instruction *CallInst = Builder.CreateCall(
-      CGF.CGM.getIntrinsic(llvm::Intrinsic::cil_ldstr));
+		CGF.CGM.getIntrinsic(llvm::Intrinsic::cil_ldstr), {});
 
     llvm::MDString *Str = llvm::MDString::get(CGF.getLLVMContext(),
       SL->getString());
@@ -1473,7 +1473,7 @@ Value *ScalarExprEmitter::VisitCastExpr(CastExpr *CE) {
 
   case CK_CLI_NullToHandle: {
     llvm::Instruction *CallInst = Builder.CreateCall(
-      CGF.CGM.getIntrinsic(llvm::Intrinsic::cil_ldnull));
+		CGF.CGM.getIntrinsic(llvm::Intrinsic::cil_ldnull), {});
 
     return CGF.Builder.CreateBitCast(CallInst, ConvertType(DestTy));
   }

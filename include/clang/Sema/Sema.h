@@ -4558,7 +4558,7 @@ public:
   bool CheckCLIGCNewType(QualType AllocType, QualType &InitType,
                          SourceLocation Loc, SourceRange R);
 
-  ActionResult<CLICustomAttribute*> ActOnCLIAttribute(Scope *S,
+  ActionResult<CLICustomAttributeAttr*> ActOnCLIAttribute(Scope *S,
                                           CLIAttributeTarget AttributeTarget,
                                               SourceLocation TargetLoc,
                                                    StringRef AttributeName,

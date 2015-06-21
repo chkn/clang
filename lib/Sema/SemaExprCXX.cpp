@@ -1312,7 +1312,7 @@ static bool CheckCLIArraySizeInitializer(Sema &S, Expr *Initializer,
     if (ConvertedSize.isInvalid())
       return true;
 
-    SizeExpr = ConvertedSize.take();
+    SizeExpr = ConvertedSize.get();
     QualType SizeType = SizeExpr->getType();
     if (!SizeType->isIntegralOrUnscopedEnumerationType())
       return true;
@@ -1366,7 +1366,7 @@ static ExprResult CheckCLIArrayExprInitializer(Sema &S, Expr *Initializer,
       return ExprError();
     }
 
-    InitExprs.push_back(Converted.take());
+    InitExprs.push_back(Converted.get());
   }
 
   return S.ActOnInitList(Initializer->getLocStart(), InitExprs,
@@ -1481,7 +1481,7 @@ Sema::BuildCXXCLIGCNew(SourceLocation StartLoc,
     if (ConvertedInit.isInvalid())
       return ExprError();
 
-    InitExpr = ConvertedInit.take();
+    InitExpr = ConvertedInit.get();
 
     Sema &S = *this;
     TypeSourceInfo *TSInfo = TSInfo = S.Context.getTrivialTypeSourceInfo(ResultType,
@@ -1523,14 +1523,14 @@ Sema::BuildCXXCLIGCNew(SourceLocation StartLoc,
     // we don't want the initialized object to be destructed.
     if (CXXBindTemporaryExpr *Binder =
             dyn_cast_or_null<CXXBindTemporaryExpr>(FullInit.get()))
-      FullInit = Owned(Binder->getSubExpr());
+      FullInit = Binder->getSubExpr();
 
-    Initializer = FullInit.take();
+    Initializer = FullInit.get();
   }
 
-  return Owned(new (Context) CLIGCNewExpr(Context, initStyle, Initializer,
+  return new (Context) CLIGCNewExpr(Context, initStyle, Initializer,
                                         ResultType, AllocTypeInfo,
-                                        StartLoc, DirectInitRange));
+                                        StartLoc, DirectInitRange);
 }
 
 /// \brief Checks that a type is suitable as the allocated type
@@ -3470,7 +3470,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
  case ICK_Literal_To_String: {
     assert(From->getStmtClass() == Stmt::StringLiteralClass);
     From = ImpCastExprToType(From, ToType, CK_CLI_StringToHandle, 
-                             VK_RValue, /*BasePath=*/0, CCK).take();
+                             VK_RValue, /*BasePath=*/0, CCK).get();
     break;
   }
 
@@ -3679,7 +3679,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
     CXXCastPath BasePath;
     BasePath.push_back(Spec);
     From = ImpCastExprToType(From, ToType, Kind, VK_RValue, &BasePath, CCK)
-             .take();
+             .get();
     break;
   }
 
@@ -3689,7 +3689,7 @@ Sema::PerformImplicitConversion(Expr *From, QualType ToType,
     if (CheckHandleConversion(From, ToType, Kind, BasePath, CStyle))
       return ExprError();
     From = ImpCastExprToType(From, ToType, Kind, VK_RValue, &BasePath, CCK)
-             .take();
+             .get();
     break;
   }
 

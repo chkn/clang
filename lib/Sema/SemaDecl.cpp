@@ -703,32 +703,26 @@ static bool isTagTypeWithMissingTag(Sema &SemaRef, LookupResult &Result,
         break;
 
       case TTK_RefClass:
-        TagName = "ref class";
         FixItTagName = "ref class ";
         break;
 
       case TTK_RefStruct:
-        TagName = "ref struct";
         FixItTagName = "ref struct ";
         break;
 
       case TTK_ValueClass:
-        TagName = "value class";
         FixItTagName = "value class ";
         break;
 
       case TTK_ValueStruct:
-        TagName = "value struct";
         FixItTagName = "value struct ";
         break;
 
       case TTK_InterfaceClass:
-        TagName = "interface class";
         FixItTagName = "interface class ";
         break;
 
       case TTK_InterfaceStruct:
-        TagName = "interface struct";
         FixItTagName = "interface struct ";
         break;
     }

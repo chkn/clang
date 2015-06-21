@@ -1499,9 +1499,10 @@ static bool IsHandleConversion(Sema &S, Expr *From, QualType FromType,
 }
 
 // In SemaCLI.cpp
+namespace clang {
 bool IsBoxingConversion(Sema &S, QualType FromType, QualType ToType,
                         QualType &ConvertedType);
-
+}
 
 static bool tryAtomicConversion(Sema &S, Expr *From, QualType ToType,
                                 bool InOverloadResolution,

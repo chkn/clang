@@ -2106,14 +2106,11 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
         TC = new toolchains::TCEToolChain(*this, Target, Args);
       else if (Target.getArch() == llvm::Triple::hexagon)
         TC = new toolchains::Hexagon_TC(*this, Target, Args);
-        break;
-      }
       else if (Target.getArchName() == "cil") {
         llvm::Triple DefaultTriple(LLVM_DEFAULT_TARGET_TRIPLE);
         if (Target.getOS() == llvm::Triple::UnknownOS)
             Target.setOS(DefaultTriple.getOS());
-        TC = new toolchains::Windows(*this, Target, Args);
-        break;
+        TC = new toolchains::MSVCToolChain(*this, Target, Args);
       }
       else if (Target.getArch() == llvm::Triple::xcore)
         TC = new toolchains::XCore(*this, Target, Args);

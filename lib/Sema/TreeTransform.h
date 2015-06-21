@@ -8757,7 +8757,7 @@ TreeTransform<Derived>::TransformCLIGCNewExpr(CLIGCNewExpr *E) {
   if (!getDerived().AlwaysRebuild() &&
       AllocTypeInfo == E->getAllocatedTypeSourceInfo() &&
       NewInit.get() == OldInit) {
-    return SemaRef.Owned(E);
+    return E;
   }
 
   QualType AllocType = AllocTypeInfo->getType();
@@ -8766,7 +8766,7 @@ TreeTransform<Derived>::TransformCLIGCNewExpr(CLIGCNewExpr *E) {
                                         AllocType,
                                         AllocTypeInfo,
                                         E->getDirectInitRange(),
-                                        NewInit.take());
+                                        NewInit.get());
 }
 
 template<typename Derived>
@@ -8778,7 +8778,7 @@ TreeTransform<Derived>::TransformCLIValueClassInitExpr(CLIValueClassInitExpr *E)
 
   if (!getDerived().AlwaysRebuild() &&
       T == E->getTypeSourceInfo())
-    return SemaRef.Owned(E);
+    return E;
 
   return getDerived().RebuildCLIValueClassInitExpr(T,
                                          /*FIXME:*/T->getTypeLoc().getEndLoc(),
@@ -10415,9 +10415,9 @@ ExprResult TreeTransform<Derived>::TransformCLIPropertyRefExpr(CLIPropertyRefExp
 
   // If nothing changed, just retain the existing expression.
   if (!getDerived().AlwaysRebuild() && Property == E->getProperty())
-    return SemaRef.Owned(E);
+    return E;
 
-  return SemaRef.Owned(E);
+  return E;
   //return getDerived().RebuildCLIPropertyRefExpr(Base.get(),
   //                                               SemaRef.Context.PseudoObjectTy,
   //                                               E->CLIPropertyDecl(),

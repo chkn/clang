@@ -4671,7 +4671,7 @@ bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
                                            QualType(CLIParamsArrType, 0),
                                            Param->getTypeSourceInfo(),
                                            SourceRange(),
-                                           InitList.take(), 0);
+                                           InitList.get(), 0);
     if (NewArray.isInvalid())
       return true;
 
@@ -4681,12 +4681,12 @@ bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
 
     ExprResult ArgE = PerformCopyInitialization(Entity,
                                                 SourceLocation(),
-                                                Owned(NewArray.take()),
+                                                NewArray.get(),
                                                 /*TopLevelOfInitList=*/false,
                                                 AllowExplicit);
     Invalid |= ArgE.isInvalid();
     AllArgs.resize(StartParamIx);
-    AllArgs.push_back(ArgE.take());
+    AllArgs.push_back(ArgE.get());
 
     return Invalid;
   }

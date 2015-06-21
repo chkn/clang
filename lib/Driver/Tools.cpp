@@ -2050,10 +2050,8 @@ static void addExceptionArgs(const ArgList &Args, types::ID InputType,
 
     EH |= shouldUseExceptionTablesForObjCExceptions(objcRuntime, Triple);
   }
-  if (Triple.getArch() == llvm::Triple::cil) {
-    ES.ExceptionsEnabled = false;
-    ES.ShouldUseExceptionTables = false;
-  }
+  if (Triple.getArch() == llvm::Triple::cil)
+    EH = false;
 
   if (types::isCXX(InputType)) {
     bool CXXExceptionsEnabled =
@@ -8595,7 +8593,7 @@ void visualstudio::ILAsm::ConstructJob(Compilation &C, const JobAction &JA,
 
   const char *Exec =
     Args.MakeArgString(getToolChain().GetProgramPath("ilasm.exe"));
-  C.addCommand(new Command(JA, *this, Exec, CmdArgs));
+  C.addCommand(std::make_unique<Command>(JA, *this, Exec, CmdArgs));
 }
 
 void visualstudio::Link::ConstructJob(Compilation &C, const JobAction &JA,

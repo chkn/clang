@@ -233,6 +233,7 @@ def MicrosoftExt : LangOpt<"MicrosoftExt">;
 def Borland : LangOpt<"Borland">;
 def CUDA : LangOpt<"CUDA">;
 def COnly : LangOpt<"CPlusPlus", 1>;
+def CPlusPlusCLI : LangOpt<"CPlusPlusCLI">;
 
 // Defines targets for target-specific attributes. The list of strings should
 // specify architectures for which the target applies, based off the ArchType
@@ -2017,3 +2018,39 @@ def OMPThreadPrivateDecl : InheritableAttr {
   let SemaHandler = 0;
   let Documentation = [Undocumented];
 }
+
+/// C++/CLI 29.2 Attribute specification
+/// 
+/// \brief Attribute specification is the application of a previously
+/// defined attribute to a declaration. An attribute is a piece of
+/// additional declarative information that is specified for a declaration.
+def CLICustomAttribute : Attr {
+  let LangOpts = [CPlusPlusCLI];
+  let Spellings = [];
+  let HasCustomParsing = 1;
+  let AdditionalMembers = [{
+public:
+  struct Argument {
+    std::string Name;
+    int16_t Position;
+    clang::Expr *Expression;
+    Argument() : Position(-1), Expression(nullptr) {}
+    bool isNamed() const { return !Name.empty(); }
+    bool isPositional() const { return Position != -1; }
+  };
+
+  clang::CXXRecordDecl *Class;
+  clang::CXXMethodDecl *Ctor;
+  SmallVector<Argument, 4> Arguments;
+
+  CLICustomAttributeAttr(SourceRange R, ASTContext &Ctx,
+             CXXRecordDecl *Attribute, CXXMethodDecl *Ctor
+             ): CLICustomAttributeAttr(R, Ctx, 0)
+  {
+    this->Class = Attribute;
+	this->Ctor = Ctor;
+  }
+  }];
+  let Documentation = [Undocumented];
+}
+

@@ -820,13 +820,14 @@ const FileEntry *HeaderSearch::LookupFile(
     if (!AssemblySearchDirs[i].getDir())
       continue;
     bool InUserSpecifiedSystemFramework = false;
+	bool HasBeenMapped = false;
     const FileEntry *FE =
       AssemblySearchDirs[i].LookupFile(Filename, *this, SearchPath, RelativePath, SuggestedModule,
-                                       InUserSpecifiedSystemFramework,MappedName);
+                                       InUserSpecifiedSystemFramework,HasBeenMapped,MappedName);
     if (!FE) continue;
 
     // Remember this location for the next lookup we do.
-    CacheLookup.second = i;
+    CacheLookup.HitIdx = i;
     return FE;
   }
 

@@ -87,10 +87,3 @@ CLIEventDecl *CLIEventDecl::CreateDeserialized(ASTContext &C, unsigned ID) {
   return new (C,ID) CLIEventDecl(0, DeclarationName(), QualType());
 }
 
-CLICustomAttribute *CLICustomAttribute::clone(ASTContext &C) const {
-  return new (C) CLICustomAttribute(SourceRange(), C, Class, Ctor);
-}
-
-void CLICustomAttribute::printPretty(llvm::raw_ostream &OS,
-                                     const PrintingPolicy &Policy) const {
-}

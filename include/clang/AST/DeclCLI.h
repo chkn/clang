@@ -30,7 +30,7 @@ enum CLIPropertyKind {
 
 /// CLIPropertyDecl - Represent a C++/CLI property.
 class CLIPropertyDecl : public ValueDecl {
-  virtual void anchor() LLVM_OVERRIDE;
+  virtual void anchor() override;
 
   CLIPropertyDecl(DeclContext *DC, DeclarationName DN, QualType Ty);
 
@@ -59,7 +59,7 @@ public:
 
 /// CLIEventDecl - Represent a C++/CLI event.
 class CLIEventDecl : public ValueDecl {
-  virtual void anchor() LLVM_OVERRIDE;
+  virtual void anchor() override;
 
   CLIEventDecl(DeclContext *DC, DeclarationName DN, QualType Ty);
   
@@ -195,48 +195,6 @@ enum CLIAttributeTarget {
   CLI_AT_property,
   CLI_AT_returnvalue,
   CLI_AT_struct
-};
-
-/// C++/CLI 29.2 Attribute specification
-/// 
-/// \brief Attribute specification is the application of a previously
-/// defined attribute to a declaration. An attribute is a piece of
-/// additional declarative information that is specified for a declaration.
-class CLICustomAttribute : public Attr {
-public:
-  struct Argument {
-    std::string Name;
-    int16_t Position;
-    Expr *Expression;
-    Argument() : Position(-1), Expression(0) {}
-
-    bool isNamed() { return !Name.empty(); }
-    bool isPositional() { return Position != -1; }
-  };
-
-  CXXRecordDecl *Class;
-  CXXMethodDecl *Ctor;
-  SmallVector<Argument, 4> Arguments;
-
-public:
-  CLICustomAttribute(SourceRange R, ASTContext &Ctx,
-    CXXRecordDecl *Attribute, CXXMethodDecl *Ctor)
-    : Attr(attr::CLICustomAttribute, R),
-      Class(Attribute), Ctor(Ctor) {
-  }
-  // TODO!!!
-  const char *getSpelling() const LLVM_OVERRIDE { return Arguments[0].Name.c_str();}
-
-  CLICustomAttribute *clone (ASTContext &C) const LLVM_OVERRIDE;
-  void printPretty(llvm::raw_ostream &OS, const PrintingPolicy &Policy)
-    const LLVM_OVERRIDE;
-
-  bool isLateParsed() const LLVM_OVERRIDE { return 0; }
-
-  static bool classof(const Attr *A) {
-    return A->getKind() == attr::CLICustomAttribute;
-  }
-  static bool classof(const AliasAttr *) { return true; }
 };
 
 } // end namespace clang

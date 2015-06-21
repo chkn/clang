@@ -1991,7 +1991,7 @@ void MicrosoftCXXNameMangler::mangleType(const PointerType *T, Qualifiers Quals,
   mangleType(PointeeType, Range);
 }
 
-void MicrosoftCXXNameMangler::mangleType(const HandleType *T,
+void MicrosoftCXXNameMangler::mangleType(const HandleType *T, Qualifiers,
                                          SourceRange Range) {
   DiagnosticsEngine &Diags = Context.getDiags();
   unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,
@@ -2000,7 +2000,7 @@ void MicrosoftCXXNameMangler::mangleType(const HandleType *T,
     << Range;
 }
 
-void MicrosoftCXXNameMangler::mangleType(const TrackingReferenceType *T,
+void MicrosoftCXXNameMangler::mangleType(const TrackingReferenceType *T, Qualifiers,
                                          SourceRange Range) {
   DiagnosticsEngine &Diags = Context.getDiags();
   unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,
@@ -2225,7 +2225,7 @@ void MicrosoftCXXNameMangler::mangleType(const AtomicType *T, Qualifiers,
 }
 
 // C++/CLI extensions
-void MicrosoftCXXNameMangler::mangleType(const CLIArrayType *T,
+void MicrosoftCXXNameMangler::mangleType(const CLIArrayType *T, Qualifiers,
                                          SourceRange Range) {
   DiagnosticsEngine &Diags = Context.getDiags();
   unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,

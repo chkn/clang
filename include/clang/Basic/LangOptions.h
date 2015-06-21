@@ -34,11 +34,6 @@ public:
 #define ENUM_LANGOPT(Name, Type, Bits, Default, Description)
 #include "clang/Basic/LangOptions.def"
 
-bool isCPlusPlusCXorCLI() const {
-  return CPlusPlusCX || CPlusPlusCLI;
-}
-
-  SanitizerOptions Sanitize;
 protected:
   // Define language options of enumeration type. These are private, and will
   // have accessors (below).
@@ -132,6 +127,10 @@ public:
 
   bool isCompatibleWithMSVC(MSVCMajorVersion MajorVersion) const {
     return MSCompatibilityVersion >= MajorVersion * 10000000U;
+  }
+
+  bool isCPlusPlusCXorCLI() const {
+	  return CPlusPlusCX || CPlusPlusCLI;
   }
 
   /// \brief Reset all of the options that are not considered when building a

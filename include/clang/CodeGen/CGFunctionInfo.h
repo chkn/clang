@@ -88,14 +88,15 @@ private:
   bool SRetAfterThis : 1;   // isIndirect()
   bool InReg : 1;           // isDirect() || isExtend() || isIndirect()
   bool CanBeFlattened: 1;   // isDirect()
+  bool IsUnsigned : 1;
 
   ABIArgInfo(Kind K)
-      : PaddingType(nullptr), TheKind(K), PaddingInReg(false), InReg(false) {}
+      : PaddingType(nullptr), TheKind(K), PaddingInReg(false), InReg(false), IsUnsigned(false) {}
 
 public:
   ABIArgInfo()
       : TypeData(nullptr), PaddingType(nullptr), DirectOffset(0),
-        TheKind(Direct), PaddingInReg(false), InReg(false) {}
+        TheKind(Direct), PaddingInReg(false), InReg(false), IsUnsigned(false) {}
 
   static ABIArgInfo getDirect(llvm::Type *T = nullptr, unsigned Offset = 0,
                               llvm::Type *Padding = nullptr,

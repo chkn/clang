@@ -247,7 +247,7 @@ void Parser::ParseCLIAttribute(ParsedAttributes &Attrs) {
   }
 #endif
 
-  ActionResult<CLICustomAttribute*> AttrRes = Actions.ActOnCLIAttribute(
+  ActionResult<CLICustomAttributeAttr*> AttrRes = Actions.ActOnCLIAttribute(
     getCurScope(), AttrTarget, TargetLoc, AttrName, AttrArgs);
 
 Exit:
@@ -328,8 +328,8 @@ ExprResult Parser::ParseCLIGCNewExpression(SourceLocation Start) {
   if (ExtraInitializer.isInvalid())
     return ExtraInitializer;
 
-  return Actions.ActOnCXXCLIGCNew(Start, DeclaratorInfo, Initializer.take(),
-      ExtraInitializer.take());
+  return Actions.ActOnCXXCLIGCNew(Start, DeclaratorInfo, Initializer.get(),
+      ExtraInitializer.get());
 }
 
 /// \brief Determine whether the given token is a C++/CLI virt-specifier.

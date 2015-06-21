@@ -543,7 +543,9 @@ ExprResult CLIPropertyOpBuilder::buildAccess(CXXMethodDecl *Method) {
   DeclAccessPair DAP = DeclAccessPair::make(Property, AS_public);
 
   MemberExpr *ME = new (S.Context) MemberExpr(RefExpr->getBase(),
-                         RefExpr->isArrow(), Method, Method->getNameInfo(),
+                         RefExpr->isArrow(),
+	                     RefExpr->getSourceRange().getBegin(), Method,
+	                     Method->getNameInfo(),
                          S.Context.BoundMemberTy, RefExpr->getValueKind(),
                          RefExpr->getObjectKind());
 
@@ -560,7 +562,7 @@ ExprResult CLIPropertyOpBuilder::buildGet() {
   CXXMethodDecl *Getter = Property->GetMethod;
   assert(Getter && "Expected a valid CLI getter method");
 
-  MemberExpr *ME = buildAccess(Getter).takeAs<MemberExpr>();
+  MemberExpr *ME = buildAccess(Getter).getAs<MemberExpr>();
   SmallVector<Expr *, 2> Args = RefExpr->getArgs();
 
   return S.BuildCallToMemberFunction(0, ME, RefExpr->getLocStart(),
@@ -579,7 +581,7 @@ ExprResult CLIPropertyOpBuilder::buildSet(Expr *op, SourceLocation opcLoc,
   CXXMethodDecl *Setter = Property->SetMethod;
   assert(Setter && "Expected a valid CLI setter method");
 
-  MemberExpr *ME = buildAccess(Setter).takeAs<MemberExpr>();
+  MemberExpr *ME = buildAccess(Setter).getAs<MemberExpr>();
   MultiExprArg Args(&op, 1);
 
   return S.BuildCallToMemberFunction(0, ME, RefExpr->getLocStart(),

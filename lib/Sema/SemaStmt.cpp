@@ -1747,7 +1747,7 @@ Sema::ActOnCLIForEachStmt(SourceLocation ForLoc, SourceLocation EachLoc,
   CLIForEachStmt *Stmt = new(Context) CLIForEachStmt(VD, Assignment,
     Body, ForLoc, EachLoc, InLoc, RParenLoc);
 
-  return Owned(Stmt);
+  return Stmt;
 }
 
 /// In an Objective C collection iteration statement:

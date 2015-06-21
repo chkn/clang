@@ -166,7 +166,7 @@ CodeGenTypes::arrangeCXXMethodType(const CXXRecordDecl *RD,
   else
     argTypes.push_back(Context.VoidPtrTy);
 
-  const CGFunctionInfo &CGInfo = ::arrangeCXXMethodType(*this, argTypes,
+  const CGFunctionInfo &CGInfo = ::arrangeLLVMFunctionInfo(*this, true, argTypes,
                 FTP->getCanonicalTypeUnqualified().getAs<FunctionProtoType>());
 
   if (CLIDefinitionData *CLIData = RD->getCLIData()) {
@@ -560,7 +560,7 @@ CodeGenTypes::arrangeLLVMFunctionInfo(CanQualType resultType,
   // them are direct or extend without a specified coerce type, specify the
   // default now.
   ABIArgInfo &retInfo = FI->getReturnInfo();
-  if (retInfo.canHaveCoerceToType() && retInfo.getCoerceToType() == nullptr)
+  if (retInfo.canHaveCoerceToType() && retInfo.getCoerceToType() == nullptr) {
     retInfo.setCoerceToType(ConvertType(FI->getReturnType()));
     if (resultType->isUnsignedIntegerType())
       retInfo.setUnsigned(true);
@@ -569,7 +569,7 @@ CodeGenTypes::arrangeLLVMFunctionInfo(CanQualType resultType,
   for (auto &I : FI->arguments()) {
     if (I.info.canHaveCoerceToType() && I.info.getCoerceToType() == nullptr)
       I.info.setCoerceToType(ConvertType(I.type));
-    if (I.type.isUnsignedIntegerType())
+    if (I.type.getTypePtr()->isUnsignedIntegerType())
       I.info.setUnsigned(true);
   }
   bool erased = FunctionsBeingProcessed.erase(FI); (void)erased;
@@ -1297,7 +1297,7 @@ CodeGenTypes::GetFunctionType(const CGFunctionInfo &FI) {
   (void)Inserted;
   assert(Inserted && "Recursively being processed?");
 
-  SmallVector<llvm::Value *, 4> Signedness;
+  SmallVector<llvm::Metadata *, 4> Signedness;
   llvm::Type *resultType = nullptr;
   const ABIArgInfo &retAI = FI.getReturnInfo();
   switch (retAI.getKind()) {
@@ -1332,8 +1332,8 @@ CodeGenTypes::GetFunctionType(const CGFunctionInfo &FI) {
     break;
   }
 
-  Signedness.push_back(llvm::ConstantInt::get(
-    llvm::IntegerType::getInt32Ty(getLLVMContext()), !retAI.isUnsigned()));
+  Signedness.push_back(llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
+    llvm::IntegerType::getInt32Ty(getLLVMContext()), !retAI.isUnsigned())));
 
   ClangToLLVMArgMapping IRFunctionArgs(getContext(), FI, true);
   SmallVector<llvm::Type*, 8> ArgTypes(IRFunctionArgs.totalIRArgs());
@@ -1370,8 +1370,8 @@ CodeGenTypes::GetFunctionType(const CGFunctionInfo &FI) {
     std::tie(FirstIRArg, NumIRArgs) = IRFunctionArgs.getIRArgs(ArgNo);
 
     if (ArgInfo.getKind() != ABIArgInfo::Ignore) {
-      Signedness.push_back(llvm::ConstantInt::get(
-        llvm::IntegerType::getInt32Ty(getLLVMContext()), !ArgInfo.isUnsigned()));
+      Signedness.push_back(llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
+        llvm::IntegerType::getInt32Ty(getLLVMContext()), !ArgInfo.isUnsigned())));
     }
 
     switch (ArgInfo.getKind()) {
@@ -3113,17 +3113,19 @@ static void ComputeCLIMethodMetadata(CodeGenModule &CGM,
   if (!CLIData || !CLIData->isGeneric())
     return;
 
-  llvm::SmallVector<llvm::Value *, 4> GenericParams;
+  llvm::SmallVector<llvm::Metadata *, 4> GenericParams;
 
-  GenericParams.push_back(llvm::ConstantInt::get(
+  GenericParams.push_back(llvm::ConstantAsMetadata::get(
+    llvm::ConstantInt::get(
     llvm::IntegerType::getInt32Ty(CGM.getLLVMContext()),
-    MD->getCLIData()->getReturnTemplateParamIndex()));
+    MD->getCLIData()->getReturnTemplateParamIndex())));
   
   for (unsigned i = 0, e = MD->getNumParams(); i != e; ++i) {
     const ParmVarDecl *Param = MD->getParamDecl(i);
     unsigned Index = Param->getTemplateParamIndex();
-    GenericParams.push_back(llvm::ConstantInt::get(
-      llvm::IntegerType::getInt32Ty(CGM.getLLVMContext()), Index));
+    GenericParams.push_back(llvm::ConstantAsMetadata::get(
+      llvm::ConstantInt::get(
+      llvm::IntegerType::getInt32Ty(CGM.getLLVMContext()), Index)));
   }
 
   //assert(GenericParams.size() == FTy->getNumParams() + 1);
