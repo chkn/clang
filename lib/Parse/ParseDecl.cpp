@@ -2931,10 +2931,11 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
         if (ParseAggregateClassKeywords(Tok, NextToken(), Aggregate)) {
           // If we were able to parse an aggregate keyword, then consume the tokens
           // and inject the new aggregate keyword token in the lexer stream.
+          Kind = tok::unknown;
           ConsumeToken();
           PP.EnterToken(Aggregate);
           ConsumeToken();
-          continue;
+          goto HandleClassSpecifier;
         }
       }
 
