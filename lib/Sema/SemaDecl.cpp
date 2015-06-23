@@ -11398,7 +11398,7 @@ Decl *Sema::ActOnTag(Scope *S, unsigned TagSpec, TagUseKind TUK,
                      SourceLocation KWLoc, CXXScopeSpec &SS,
                      IdentifierInfo *Name, SourceLocation NameLoc,
                      AttributeList *Attr, AccessSpecifier AS,
-                     SourceLocation ModulePrivateLoc,
+                     SourceLocation ASLoc, SourceLocation ModulePrivateLoc,
                      MultiTemplateParamsArg TemplateParameterLists,
                      bool &OwnedDecl, bool &IsDependent,
                      SourceLocation ScopedEnumKWLoc,
@@ -12083,6 +12083,11 @@ CreateNewDecl:
     }
     else
       Invalid = true;
+  }
+
+  if (getLangOpts().isCPlusPlusCXorCLI() && AS != AS_none && ASLoc.isValid()) {
+	  New->setAccess(AS);
+	  New->setAccessLoc(ASLoc);
   }
 
   if (RecordDecl *RD = dyn_cast<RecordDecl>(New)) {

@@ -1250,9 +1250,7 @@ bool Parser::ParseClassSpecifier(tok::TokenKind TokenToAssume,
                                  bool EnteringContext, DeclSpecContext DSC, 
                                  ParsedAttributesWithRange &Attributes) {
   DeclSpec::TST TagType = TST_error;
- 
-  AccessSpecifier Visibility = AS_private; // default
-  SourceLocation VisibilityLoc;
+  SourceLocation ASLoc;
 
   // If TokenToAssume is not unknown, then the caller already provides us with
   // the token to convert. This happens when recovering from missing TSTs.
@@ -1261,8 +1259,8 @@ bool Parser::ParseClassSpecifier(tok::TokenKind TokenToAssume,
     goto SkipClassKeyParsing;
   }
 
-  if (getLangOpts().isCPlusPlusCXorCLI())
-    ParseTagVisibility(Visibility, VisibilityLoc);
+  if (getLangOpts().isCPlusPlusCXorCLI() && AS == AS_none)
+    ParseTagVisibility(AS, ASLoc);
 
   if ((TagType = ConvertTokenToTagTypeSpecifier()) != TST_error)
     ConsumeToken();
@@ -1764,7 +1762,7 @@ SkipClassKeyParsing:
     // Declaration or definition of a class type
     TagOrTempResult = Actions.ActOnTag(getCurScope(), TagType, TUK, StartLoc,
                                        SS, Name, NameLoc, attrs.getList(), AS,
-                                       DS.getModulePrivateSpecLoc(),
+                                       ASLoc, DS.getModulePrivateSpecLoc(),
                                        TParams, Owned, IsDependent,
                                        SourceLocation(), false,
                                        clang::TypeResult(),

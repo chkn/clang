@@ -2778,6 +2778,9 @@ private:
     return NamedDeclOrQualifier.get<ExtInfo *>();
   }
 
+  // The location of the Access specifier
+  SourceLocation AccessLoc;
+
 protected:
   TagDecl(Kind DK, TagKind TK, const ASTContext &C, DeclContext *DC,
           SourceLocation L, IdentifierInfo *Id, TagDecl *PrevDecl,
@@ -2820,6 +2823,9 @@ public:
 
   SourceLocation getRBraceLoc() const { return RBraceLoc; }
   void setRBraceLoc(SourceLocation L) { RBraceLoc = L; }
+
+  SourceLocation getAccessLoc() const { return AccessLoc; }
+  void setAccessLoc(SourceLocation L) { AccessLoc = L; }
 
   /// getInnerLocStart - Return SourceLocation representing start of source
   /// range ignoring outer template declarations.

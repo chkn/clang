@@ -3338,10 +3338,8 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
 
       if (isClassKey(Key))
         goto HandleClassSpecifier;
-      else if (isEnumKey(Key)) {
-        ConsumeToken();
+      else if (isEnumKey(Key))
         goto HandleEnumSpecifier;
-      }
       else
         goto DoneWithDeclSpec;
 
@@ -3732,9 +3730,14 @@ void Parser::ParseEnumSpecifier(tok::TokenKind TokenToAssume,
                                 const ParsedTemplateInfo &TemplateInfo,
                                 AccessSpecifier AS, DeclSpecContext DSC) {
 
-  if (TokenToAssume != tok::unknown) {
+  SourceLocation ASLoc;
+
+  if (TokenToAssume == tok::unknown) {
     // Check for access specifier.
-  } else {
+    if (getLangOpts().isCPlusPlusCXorCLI() && AS == AS_none) {
+      if (!ParseTagVisibility(AS, ASLoc))
+        AS = AS_none;
+    }
     ConsumeToken();
   }
 
@@ -4011,8 +4014,8 @@ void Parser::ParseEnumSpecifier(tok::TokenKind TokenToAssume,
   unsigned DiagID;
   Decl *TagDecl = Actions.ActOnTag(getCurScope(), DeclSpec::TST_enum, TUK,
                                    StartLoc, SS, Name, NameLoc, attrs.getList(),
-                                   AS, DS.getModulePrivateSpecLoc(), TParams,
-                                   Owned, IsDependent, ScopedEnumKWLoc,
+                                   AS, ASLoc, DS.getModulePrivateSpecLoc(),
+                                   TParams, Owned, IsDependent, ScopedEnumKWLoc,
                                    IsScopedUsingClassTag, BaseType,
                                    DSC == DSC_type_specifier, &SkipBody);
 
