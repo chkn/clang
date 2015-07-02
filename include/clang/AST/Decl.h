@@ -2708,7 +2708,7 @@ public:
 private:
   // FIXME: This can be packed into the bitfields in Decl.
   /// TagDeclKind - The TagKind enum.
-  unsigned TagDeclKind : 3;
+  unsigned TagDeclKind : 4;
 
   /// IsCompleteDefinition - True if this is a definition ("struct foo
   /// {};"), false if it is a declaration ("struct foo;").  It is not

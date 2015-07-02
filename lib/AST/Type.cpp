@@ -1399,7 +1399,14 @@ TypeWithKeyword::getKeywordForTypeSpec(unsigned TypeSpec) {
   case TST_interface: return ETK_Interface;
   case TST_union: return ETK_Union;
   case TST_enum: return ETK_Enum;
+  case TST_ref_class: return ETK_RefClass;
+  case TST_ref_struct: return ETK_RefStruct;
+  case TST_value_class: return ETK_ValueClass;
+  case TST_value_struct: return ETK_ValueStruct;
+  case TST_interface_class: return ETK_InterfaceClass;
+  case TST_interface_struct: return ETK_InterfaceStruct;
   }
+  llvm_unreachable("Unknown type specifier.");
 }
 
 TagTypeKind
@@ -1430,7 +1437,7 @@ TypeWithKeyword::getKeywordForTagTypeKind(TagTypeKind Kind) {
   case TTK_Union: return ETK_Union;
   case TTK_Enum: return ETK_Enum;
   case TTK_RefStruct: return ETK_RefStruct;
-  case TTK_RefClass: return ETK_Class;
+  case TTK_RefClass: return ETK_RefClass;
   case TTK_InterfaceStruct: return ETK_InterfaceStruct;
   case TTK_InterfaceClass: return ETK_InterfaceClass;
   case TTK_ValueStruct: return ETK_ValueStruct;
@@ -1447,6 +1454,12 @@ TypeWithKeyword::getTagTypeKindForKeyword(ElaboratedTypeKeyword Keyword) {
   case ETK_Interface: return TTK_Interface;
   case ETK_Union: return TTK_Union;
   case ETK_Enum: return TTK_Enum;
+  case ETK_RefStruct: return TTK_RefStruct;
+  case ETK_RefClass: return TTK_RefClass;
+  case ETK_InterfaceStruct: return TTK_InterfaceStruct;
+  case ETK_InterfaceClass: return TTK_InterfaceClass;
+  case ETK_ValueStruct: return TTK_ValueStruct;
+  case ETK_ValueClass: return TTK_ValueClass;
   case ETK_None: // Fall through.
   case ETK_Typename:
     llvm_unreachable("Elaborated type keyword is not a tag type kind.");
@@ -1465,6 +1478,12 @@ TypeWithKeyword::KeywordIsTagTypeKind(ElaboratedTypeKeyword Keyword) {
   case ETK_Interface:
   case ETK_Union:
   case ETK_Enum:
+  case ETK_RefStruct:
+  case ETK_RefClass:
+  case ETK_InterfaceStruct:
+  case ETK_InterfaceClass:
+  case ETK_ValueStruct:
+  case ETK_ValueClass:
     return true;
   }
   llvm_unreachable("Unknown elaborated type keyword.");
@@ -1479,6 +1498,12 @@ StringRef TypeWithKeyword::getKeywordName(ElaboratedTypeKeyword Keyword) {
   case ETK_Interface: return "__interface";
   case ETK_Union:  return "union";
   case ETK_Enum:   return "enum";
+  case ETK_RefStruct: return "ref struct";
+  case ETK_RefClass: return "ref class";
+  case ETK_InterfaceStruct: return "interface struct";
+  case ETK_InterfaceClass: return "interface class";
+  case ETK_ValueStruct: return "value struct";
+  case ETK_ValueClass: return "value class";
   }
 
   llvm_unreachable("Unknown elaborated type keyword.");
