@@ -1481,7 +1481,8 @@ static bool IsHandleConversion(Sema &S, Expr *From, QualType FromType,
       }
     }
 
-    if (S.Context.hasSameType(ToType, S.getCLIContext()->Types.Array.Ty)) {
+	QualType CLIArrayType = S.getCLIContext()->Types.Array.Ty;
+    if (!CLIArrayType.isNull() && S.Context.hasSameType(ToType, CLIArrayType)) {
       ConvertedType = ToType;
       SCS.Second = ICK_Handle_Conversion;
       return true;
