@@ -1600,7 +1600,24 @@ QualType CXXMethodDecl::getThisType(ASTContext &C) const {
 
   assert(isInstance() && "No 'this' for static methods!");
 
-  QualType ClassTy = C.getTypeDeclType(getParent());
+  const CXXRecordDecl *Parent = getParent();
+  QualType ClassTy = C.getTypeDeclType(Parent);
+
+  if (CLIDefinitionData *CLIData = Parent->getCLIData()) {
+    // Within an instance constructor or instance function member of a
+	// ref class T, this is treated as an rvalue of type T^. Within an
+	// instance constructor or instance function member of a value class V,
+	// this is treated as an rvalue of type interior_ptr<V> (C++/CLI 22.3.3 Meaning of this)
+    switch (CLIData->Type) {
+	case CLI_RT_ReferenceType:
+      return C.getHandleType(ClassTy);
+	case CLI_RT_ValueType:
+	  //FIXME: Return interior_ptr
+	default:
+      llvm_unreachable("Invalid CLI record type.");
+    }
+  }
+
   ClassTy = C.getQualifiedType(ClassTy,
                                Qualifiers::fromCVRMask(getTypeQualifiers()));
   return C.getPointerType(ClassTy);
