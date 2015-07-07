@@ -2569,7 +2569,7 @@ Sema::PerformObjectMemberConversion(Expr *From,
     if (FromType->getAs<PointerType>()) {
       FromRecordType = FromType->getPointeeType();
       PointerConversions = true;
-    } if (FromType->getAs<HandleType>()) {
+    } else if (FromType->getAs<HandleType>()) {
       FromRecordType = FromType->getPointeeType();
     } else {
       FromRecordType = FromType;
