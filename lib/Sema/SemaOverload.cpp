@@ -8697,7 +8697,7 @@ bool clang::isBetterOverloadCandidate(Sema &S, const OverloadCandidate &Cand1,
   if (HasBetterConversion)
     return true;
 
-  if (S.getLangOpts().CPlusPlusCLI) {
+  if (S.getLangOpts().CPlusPlusCLI && Cand1.Function && Cand2.Function) {
     // C++/CLI 14.6 Parameter array conversions
     // "The synthesized overloads have higher cost than other non-
     // synthesized overloads, and they have lower cost than functions

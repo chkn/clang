@@ -4549,7 +4549,7 @@ Sema::ConvertArgumentsForCall(CallExpr *Call, Expr *Fn,
   if (Invalid)
     return true;
   unsigned TotalNumArgs = AllArgs.size();
-  if (isCLIParameterArrayOverload(FDecl))
+  if (FDecl && isCLIParameterArrayOverload(FDecl))
     Call->setNumArgs(Context, TotalNumArgs);
   for (unsigned i = 0; i < TotalNumArgs; ++i)
     Call->setArg(i, AllArgs[i]);
@@ -4634,7 +4634,7 @@ bool Sema::GatherArgumentsForCall(SourceLocation CallLoc, FunctionDecl *FDecl,
   ///  * Parameter arrays (params object[])
   ///  * Arg-lists (__arglist)
 
-  if (isCLIParameterArrayOverload(FDecl)) {
+  if (FDecl && isCLIParameterArrayOverload(FDecl)) {
     /// C++/CLI 14.6 Parameter array conversions
     /// "If overload resolution selects one of the synthesized signatures, the
     /// conversion sequences needed for each argument to satisfy the call is
@@ -5192,7 +5192,7 @@ Sema::BuildResolvedCallExpr(Expr *Fn, NamedDecl *NDecl,
   TheCall->setType(FuncT->getCallResultType(Context));
   TheCall->setValueKind(Expr::getValueKindForType(FuncT->getReturnType()));
 
-  if (isCLIParameterArrayOverload(FDecl))
+  if (FDecl && isCLIParameterArrayOverload(FDecl))
     FuncT = FDecl->getType()->getAs<FunctionType>();
 
   const FunctionProtoType *Proto = dyn_cast<FunctionProtoType>(FuncT);
