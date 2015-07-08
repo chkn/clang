@@ -177,7 +177,7 @@ class CXXBaseSpecifier {
   ///
   /// The actual type of data stored here is an AccessSpecifier, but we use
   /// "unsigned" here to work around a VC++ bug.
-  unsigned Access : 2;
+  unsigned Access : 3;
 
   /// \brief Whether the class contains a using declaration
   /// to inherit the named class's constructors.
