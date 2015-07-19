@@ -8881,6 +8881,16 @@ QualType Sema::CheckCompareOperands(ExprResult &LHS, ExprResult &RHS,
     return ResultTy;
   }
 
+  if (getLangOpts().CPlusPlusCLI &&
+	  LHSType->isHandleType() &&
+	  RHSType->isHandleType()) {
+    //FIXME: This only works if the types are the same.
+    //  We need to implement the rules from
+    //    15.8.1 Handle equality operators [C++/CLI]
+    if (Context.typesAreCompatible(LHSType, RHSType))
+      return ResultTy;
+  }
+
   if (LHSType->isObjCObjectPointerType() ||
       RHSType->isObjCObjectPointerType()) {
     const PointerType *LPT = LHSType->getAs<PointerType>();
