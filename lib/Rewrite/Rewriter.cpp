@@ -49,11 +49,11 @@ static inline bool isWhitespace(unsigned char c) {
 }
 
 void RewriteBuffer::RemoveText(unsigned OrigOffset, unsigned Size,
-                               bool removeLineIfEmpty) {
+                               bool removeLineIfEmpty, bool afterInserts) {
   // Nothing to remove, exit early.
   if (Size == 0) return;
 
-  unsigned RealOffset = getMappedOffset(OrigOffset, true);
+  unsigned RealOffset = getMappedOffset(OrigOffset, afterInserts);
   assert(RealOffset+Size <= Buffer.size() && "Invalid location");
 
   // Remove the dead characters.
@@ -295,7 +295,8 @@ bool Rewriter::RemoveText(SourceLocation Start, unsigned Length,
   if (!isRewritable(Start)) return true;
   FileID FID;
   unsigned StartOffs = getLocationOffsetAndFileID(Start, FID);
-  getEditBuffer(FID).RemoveText(StartOffs, Length, opts.RemoveLineIfEmpty);
+  getEditBuffer(FID).RemoveText(StartOffs, Length, opts.RemoveLineIfEmpty,
+                                !opts.IncludeInsertsAtBeginOfRange);
   return false;
 }
 
